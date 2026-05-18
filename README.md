@@ -74,7 +74,7 @@ donna run
 
 ## Documentation
 
-Full documentation at [nikolasskyl.github.io/toucan](https://nikolasskyl.github.io/toucan).
+Full documentation [here](https://nikolasskyl.github.io/toucan/docs/).
 
 
 ## Examples
