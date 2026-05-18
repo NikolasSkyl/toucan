@@ -1,0 +1,9 @@
+name = "chat_sessions"
+version = "0.1.0"
+description = "Real-time WebSocket chat with named users via sessions"
+
+[dependencies]
+donna   = { git = "https://github.com/donna-lang/donna_stdlib",  version = ">=0.2.0 and <1.0.0" }
+toucan  = { path = "../.." }
+mongoose = { git = "https://github.com/NikolasSkyl/mongoose", version = ">=0.2.0 and <1.0.0" }
+mustache = { git = "https://github.com/NikolasSkyl/mustache",    version = ">=0.1.1 and <1.0.0" }

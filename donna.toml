@@ -1,0 +1,14 @@
+name = "toucan"
+version = "0.1.0"
+description = "A micro webframework for for Donna"
+authors = ["Nikolas Skyl"]
+licences = ["MIT"]
+repository = { type = "github", user = "NikolasSkyl", repo = "toucan" }
+links = [{ title = "Website", href = "https://nikolasskyl.github.io/toucan" }]
+
+[dependencies]
+donna = { git = "https://github.com/donna-lang/donna_stdlib", version = ">=0.2.0 and <1.0.0" }
+mongoose = { git = "https://github.com/NikolasSkyl/mongoose", version = ">=0.2.0 and <1.0.0" }
+
+[dev-dependencies]
+unittest = { git = "https://github.com/donna-lang/unittest", version = ">=0.1.0 and <1.0.0" }

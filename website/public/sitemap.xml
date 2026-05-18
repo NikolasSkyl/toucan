@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://nikolasskyl.github.io/toucan/</loc></url>
+  <url><loc>https://nikolasskyl.github.io/toucan/posts/v0-1-0/</loc></url>
+  <url><loc>https://nikolasskyl.github.io/toucan/chronicles/</loc></url>
+  <url><loc>https://nikolasskyl.github.io/toucan/docs/routing/</loc></url>
+  <url><loc>https://nikolasskyl.github.io/toucan/docs/middleware/</loc></url>
+  <url><loc>https://nikolasskyl.github.io/toucan/docs/requests/</loc></url>
+  <url><loc>https://nikolasskyl.github.io/toucan/docs/responses/</loc></url>
+  <url><loc>https://nikolasskyl.github.io/toucan/docs/handlers/</loc></url>
+  <url><loc>https://nikolasskyl.github.io/toucan/docs/</loc></url>
+  <url><loc>https://nikolasskyl.github.io/toucan/docs/websockets/</loc></url>
+</urlset>

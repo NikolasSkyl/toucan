@@ -1,0 +1,65 @@
+import donna/string
+import toucan
+import toucan/cookie
+
+/// An opaque session store handle.
+///
+/// Currently backed by a module-global in-process store. Pass the value
+/// returned by `new_store` to `toucan.serve_with` or `toucan.serve_with_chat`.
+pub type Store:
+  Store
+
+@external("c", "donna_session_generate_id")
+fn donna_session_generate_id() -> String
+
+@external("c", "donna_session_get")
+fn donna_session_get_ffi(sid: String, key: String) -> String
+
+@external("c", "donna_session_put")
+fn donna_session_put_ffi(sid: String, key: String, value: String) -> Int
+
+@external("c", "donna_session_destroy")
+fn donna_session_destroy_ffi(sid: String) -> Int
+
+/// Create the session store.
+///
+/// Call this once in `main` and pass the result to `toucan.serve_with`.
+pub fn new_store() -> Store:
+  Store
+
+/// Return the session ID for this request, creating a new one when absent.
+///
+/// Reads the `sid` cookie. If the cookie is missing, generates a new random
+/// session ID. Call `set_cookie` on your response to send it to the client.
+pub fn start(c: toucan.Ctx, store: Store) -> String:
+  let cookies = cookie.parse(toucan.header_of(c, "Cookie"))
+  let existing = cookie.get(cookies, "sid")
+  case string.is_empty(existing):
+    False -> existing
+    True -> donna_session_generate_id()
+
+/// Read a value from the session.
+///
+/// Returns `""` when the key or session does not exist.
+pub fn get(store: Store, sid: String, key: String) -> String:
+  donna_session_get_ffi(sid, key)
+
+/// Write a value into the session.
+pub fn put(store: Store, sid: String, key: String, value: String) -> Nil:
+  let _ = donna_session_put_ffi(sid, key, value)
+  Nil
+
+/// Remove a session and all its data.
+pub fn destroy(store: Store, sid: String) -> Nil:
+  let _ = donna_session_destroy_ffi(sid)
+  Nil
+
+/// Add a `Set-Cookie` header that persists the session ID.
+///
+/// Call this on every response where a new session was created.
+pub fn set_cookie(c: toucan.Ctx, sid: String) -> toucan.Ctx:
+  toucan.set_header(
+    c,
+    "Set-Cookie",
+    "sid=" <> sid <> "; HttpOnly; Path=/; SameSite=Lax"
+  )

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>htmx Todos · Toucan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">🦜 toucan / htmx_todos</div>
+
+    <div class="card">
+      <h1>Todos</h1>
+      <p>Powered by <a href="https://htmx.org" target="_blank">htmx</a> — no page reloads.</p>
+
+      <form hx-post="/todos"
+            hx-target="#todo-list"
+            hx-swap="innerHTML"
+            hx-on::after-request="this.reset()">
+        <div class="field">
+          <input type="text" name="title" placeholder="What needs doing?" autofocus autocomplete="off">
+        </div>
+        <button class="btn btn-full">Add</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <ul class="todo-list" id="todo-list">
+        {{#todos}}
+        <li class="todo-item" id="todo-{{id}}">
+          <button class="btn btn-sm btn-ghost"
+                  hx-post="/todos/{{id}}/toggle"
+                  hx-target="#todo-list"
+                  hx-swap="innerHTML">{{check}}</button>
+          <span class="todo-label {{done_class}}">{{title}}</span>
+          <button class="btn btn-sm btn-danger"
+                  hx-delete="/todos/{{id}}"
+                  hx-target="#todo-list"
+                  hx-swap="innerHTML">✕</button>
+        </li>
+        {{/todos}}
+        {{#empty}}
+        <li class="muted" style="padding:.5rem 0">No todos yet.</li>
+        {{/empty}}
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

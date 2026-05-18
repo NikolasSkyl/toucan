@@ -1,0 +1,832 @@
+//// Toucan — a composable HTTP web framework for Donna.
+////
+//// Handlers are plain functions `fn(Ctx) -> Ctx`.  Route definitions are built
+//// by piping a `Ctx` through a chain of filters and a terminal response:
+////
+//// ```donna
+//// import toucan
+////
+//// fn handler(c: toucan.Ctx) -> toucan.Ctx:
+//// c
+//// |> toucan.try(home)
+//// |> toucan.not_found
+////
+//// fn home(c: toucan.Ctx) -> toucan.Ctx:
+//// c
+//// |> toucan.get
+//// |> toucan.path("/")
+//// |> toucan.ok("Hello from Toucan!")
+////
+//// pub fn main() -> Nil:
+//// toucan.serve(handler, 8080)
+
+import donna/string
+import mongoose
+import toucan/form
+import toucan/logger
+import toucan/query
+import toucan/router
+import toucan/version
+
+/// An incoming HTTP request.
+pub type Req:
+  Req(String, String, String, String, String, String)
+
+/// An outgoing HTTP response.
+pub type Res:
+  Res(Int, String, String, String)
+
+/// Three-state context flowing through the handler pipeline.
+///
+/// - `Active`   — request is still being matched; params accumulate here
+/// - `Rejected` — a filter did not match; `try` resets this to `Active`
+/// - `Matched`  — a response has been set; all subsequent handlers are skipped
+pub type Ctx:
+  Active(Req, List(#(String, String)))
+  Rejected(Req)
+  Matched(Res)
+
+pub fn req_method(r: Req) -> String:
+  case r:
+    Req(m, _, _, _, _, _) -> m
+
+pub fn req_path(r: Req) -> String:
+  case r:
+    Req(_, p, _, _, _, _) -> p
+
+pub fn req_query(r: Req) -> String:
+  case r:
+    Req(_, _, q, _, _, _) -> q
+
+pub fn req_content_type(r: Req) -> String:
+  case r:
+    Req(_, _, _, ct, _, _) -> ct
+
+pub fn req_headers(r: Req) -> String:
+  case r:
+    Req(_, _, _, _, h, _) -> h
+
+pub fn req_body(r: Req) -> String:
+  case r:
+    Req(_, _, _, _, _, b) -> b
+
+pub fn ctx_req(c: Ctx) -> Req:
+  case c:
+    Active(r, _) -> r
+    Rejected(r) -> r
+    Matched(_) -> Req("", "", "", "", "", "")
+
+/// Return a URL parameter captured by a `:name` segment, or `""`.
+pub fn param(c: Ctx, key: String) -> String:
+  case c:
+    Active(_, params) -> find_param(params, key)
+    Matched(_) -> ""
+    Rejected(_) -> ""
+
+fn find_param(params: List(#(String, String)), key: String) -> String:
+  case params:
+    [] -> ""
+    [#(k, v), ..rest] ->
+      case k == key:
+        True -> v
+        False -> find_param(rest, key)
+
+/// Run `handler` against the current context.
+///
+/// If the handler rejects, the original `Active` context is restored so the
+/// next `try` can attempt a different route.  If already `Matched`, skips.
+pub fn try(c: Ctx, handler: fn(Ctx) -> Ctx) -> Ctx:
+  case c:
+    Matched(_) -> c
+    Active(_, _) ->
+      case handler(c):
+        Rejected(_) -> c
+        other -> other
+    Rejected(_) -> c
+
+/// Run a stateful `handler` against the current context.
+///
+/// Use this with `serve_with` when several routes need shared application
+/// state such as a database handle or configuration record.
+pub fn try_with(c: Ctx, state: a, handler: fn(Ctx, a) -> Ctx) -> Ctx:
+  case c:
+    Matched(_) -> c
+    Active(_, _) ->
+      case handler(c, state):
+        Rejected(_) -> c
+        other -> other
+    Rejected(_) -> c
+
+/// Respond 404 if no handler has matched yet (plain text).
+pub fn not_found(c: Ctx) -> Ctx:
+  case c:
+    Active(_, _) ->
+      Matched(Res(404, "text/html; charset=utf-8", not_found_html(), ""))
+    other -> other
+
+/// Respond with a styled 500 Internal Server Error page.
+pub fn internal_error(c: Ctx) -> Ctx:
+  case c:
+    Active(_, _) ->
+      Matched(Res(500, "text/html; charset=utf-8", error_html(), ""))
+    other -> other
+
+/// Serve the built-in Toucan landing page for `GET /`.
+///
+/// Place this before `not_found` so it only fires when no other route matched.
+pub fn landing_page(c: Ctx) -> Ctx:
+  case c:
+    Active(r, _) ->
+      case req_method(r) == "GET":
+        True ->
+          let #(matched, _) = router.match_path("/", req_path(r))
+          case matched:
+            True ->
+              Matched(Res(200, "text/html; charset=utf-8", landing_html(), ""))
+            False -> Rejected(r)
+        False -> Rejected(r)
+    other -> other
+
+pub fn get(c: Ctx) -> Ctx:
+  require_method(c, "GET")
+
+pub fn post(c: Ctx) -> Ctx:
+  require_method(c, "POST")
+
+pub fn put(c: Ctx) -> Ctx:
+  require_method(c, "PUT")
+
+pub fn delete(c: Ctx) -> Ctx:
+  require_method(c, "DELETE")
+
+pub fn patch(c: Ctx) -> Ctx:
+  require_method(c, "PATCH")
+
+fn require_method(c: Ctx, m: String) -> Ctx:
+  case c:
+    Active(r, _) ->
+      case req_method(r) == m:
+        True -> c
+        False -> Rejected(r)
+    other -> other
+
+/// Match the request path against `pattern`.
+///
+/// Segments starting with `:` are captures; use `param(c, "name")` to read them.
+pub fn path(c: Ctx, pattern: String) -> Ctx:
+  case c:
+    Active(r, _) ->
+      let #(matched, new_params) = router.match_path(pattern, req_path(r))
+      case matched:
+        True -> Active(r, new_params)
+        False -> Rejected(r)
+    other -> other
+
+/// Require the request path to start with `prefix` (useful for sub-routers).
+pub fn path_prefix(c: Ctx, prefix: String) -> Ctx:
+  case c:
+    Active(r, params) ->
+      case router.has_prefix(req_path(r), prefix):
+        True -> c
+        False -> Rejected(r)
+    other -> other
+
+/// Respond 200 with plain text.
+pub fn ok(c: Ctx, bdy: String) -> Ctx:
+  set_response(c, 200, "text/plain; charset=utf-8", bdy)
+
+/// Respond 200 with HTML.
+pub fn html(c: Ctx, bdy: String) -> Ctx:
+  set_response(c, 200, "text/html; charset=utf-8", bdy)
+
+/// Respond 200 with JSON.
+pub fn json(c: Ctx, bdy: String) -> Ctx:
+  set_response(c, 200, "application/json", bdy)
+
+/// Respond 201 Created.
+pub fn created(c: Ctx, bdy: String) -> Ctx:
+  set_response(c, 201, "text/plain; charset=utf-8", bdy)
+
+/// Respond 204 No Content.
+pub fn no_content(c: Ctx) -> Ctx:
+  set_response(c, 204, "text/plain; charset=utf-8", "")
+
+/// Respond with a fully custom status, content-type, and body.
+pub fn respond(c: Ctx, status_code: Int, ct: String, bdy: String) -> Ctx:
+  set_response(c, status_code, ct, bdy)
+
+fn set_response(c: Ctx, s: Int, ct: String, bdy: String) -> Ctx:
+  case c:
+    Active(_, _) -> Matched(Res(s, ct, bdy, ""))
+    other -> other
+
+/// Add an HTTP response header (call after a terminal handler).
+pub fn set_header(c: Ctx, key: String, val: String) -> Ctx:
+  case c:
+    Matched(Res(s, ct, bdy, hdrs)) ->
+      Matched(Res(s, ct, bdy, hdrs <> key <> ": " <> val <> "\r\n"))
+    other -> other
+
+/// Return the HTTP method of the current request.
+pub fn method_of(c: Ctx) -> String:
+  req_method(ctx_req(c))
+
+/// Return the URL path of the current request.
+pub fn path_of(c: Ctx) -> String:
+  req_path(ctx_req(c))
+
+/// Return the raw query string of the current request.
+pub fn query_of(c: Ctx) -> String:
+  req_query(ctx_req(c))
+
+/// Return the Content-Type header of the current request.
+pub fn content_type_of(c: Ctx) -> String:
+  req_content_type(ctx_req(c))
+
+/// Return the body of the current request.
+pub fn body_of(c: Ctx) -> String:
+  req_body(ctx_req(c))
+
+/// Look up a request header by name (case-insensitive), returning `""` if absent.
+///
+/// ```donna
+/// let auth = toucan.header_of(c, "Authorization")
+/// let cookie = toucan.header_of(c, "Cookie")
+/// ```
+pub fn header_of(c: Ctx, name: String) -> String:
+  mongoose.header(ctx_req_raw(c), name)
+
+fn ctx_req_raw(c: Ctx) -> mongoose.Request:
+  case c:
+    Active(r, _) ->
+      mongoose.Request(
+        req_method(r),
+        req_path(r),
+        req_query(r),
+        req_content_type(r),
+        req_headers(r),
+        req_body(r)
+      )
+    Rejected(r) ->
+      mongoose.Request(
+        req_method(r),
+        req_path(r),
+        req_query(r),
+        req_content_type(r),
+        req_headers(r),
+        req_body(r)
+      )
+    Matched(_) -> mongoose.Request("", "", "", "", "", "")
+
+/// Parse the request query string into key-value pairs.
+///
+/// ```donna
+/// let page = toucan.query_param(c, "page")
+/// ```
+pub fn query_params(c: Ctx) -> List(#(String, String)):
+  query.parse(req_query(ctx_req(c)))
+
+/// Return a single query parameter by name, or `""` if absent.
+pub fn query_param(c: Ctx, key: String) -> String:
+  query.get(query_params(c), key)
+
+/// Parse the request body as `application/x-www-form-urlencoded` fields.
+///
+/// ```donna
+/// let fields = toucan.form_fields(c)
+/// let name   = toucan.form_field(c, "name")
+/// ```
+pub fn form_fields(c: Ctx) -> List(#(String, String)):
+  form.parse(body_of(c))
+
+/// Return a single form field by name, or `""` if absent.
+pub fn form_field(c: Ctx, key: String) -> String:
+  form.get(form_fields(c), key)
+
+/// Add CORS headers to every matched response.
+///
+/// Pair with `preflight` at the start of the pipeline. Pass `"*"` to allow
+/// any origin. Automatically adds `Access-Control-Max-Age` on 204 responses
+/// (preflight) and `Access-Control-Expose-Headers` on all others.
+///
+/// ```donna
+/// fn router(c: toucan.Ctx) -> toucan.Ctx:
+///   c
+///   |> toucan.preflight
+///   |> toucan.try(home)
+///   |> toucan.not_found
+///   |> toucan.cors("*")
+///   |> toucan.secure_headers
+/// ```
+pub fn cors(c: Ctx, origin: String) -> Ctx:
+  case c:
+    Matched(Res(s, ct, bdy, hdrs)) ->
+      let base = hdrs <> "Access-Control-Allow-Origin: " <> origin <> "\r\n" <> "Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS\r\n" <> "Access-Control-Allow-Headers: Content-Type, Authorization\r\n"
+      let extra = case s == 204:
+        True -> "Access-Control-Max-Age: 86400\r\n"
+        False -> "Access-Control-Expose-Headers: Content-Length\r\n"
+      Matched(Res(s, ct, bdy, base <> extra))
+    other -> other
+
+/// Intercept `OPTIONS` preflight requests (place before route handlers).
+///
+/// Responds 204 with no body; `cors/2` at the end of the pipeline attaches
+/// the correct CORS headers — avoiding any duplicate header values.
+/// Non-OPTIONS requests pass through unchanged.
+pub fn preflight(c: Ctx) -> Ctx:
+  case c:
+    Active(r, _) ->
+      case req_method(r) == "OPTIONS":
+        True -> Matched(Res(204, "text/plain", "", ""))
+        False -> c
+    other -> other
+
+/// Add common security headers to a matched response.
+///
+/// `X-Content-Type-Options`, `X-Frame-Options`, and `Referrer-Policy` are
+/// applied automatically by Toucan on every response — you only need to call
+/// this directly if you want to apply them earlier in the pipeline for a
+/// specific sub-route.
+pub fn secure_headers(c: Ctx) -> Ctx:
+  case c:
+    Matched(Res(s, ct, bdy, hdrs)) ->
+      let new_hdrs = hdrs <> "X-Content-Type-Options: nosniff\r\n" <> "X-Frame-Options: DENY\r\n" <> "Referrer-Policy: strict-origin-when-cross-origin\r\n"
+      Matched(Res(s, ct, bdy, new_hdrs))
+    other -> other
+
+/// Add a `Content-Security-Policy` header to every matched response.
+///
+/// ```donna
+/// fn router(c: toucan.Ctx) -> toucan.Ctx:
+///   c
+///   |> toucan.try(home)
+///   |> toucan.not_found
+///   |> toucan.csp("default-src 'self'")
+/// ```
+pub fn csp(c: Ctx, policy: String) -> Ctx:
+  case c:
+    Matched(Res(s, ct, bdy, hdrs)) ->
+      Matched(
+        Res(s, ct, bdy, hdrs <> "Content-Security-Policy: " <> policy <> "\r\n")
+      )
+    other -> other
+
+/// Serve static files from `dir` matched by request path.
+///
+/// Appends `index.html` when the path ends with `/`.
+/// Returns `Rejected` when the file does not exist.
+///
+/// ```donna
+/// fn serve_static(c: toucan.Ctx) -> toucan.Ctx:
+///   toucan.static_dir(c, "priv/static")
+/// ```
+pub fn static_dir(c: Ctx, dir: String) -> Ctx:
+  case c:
+    Active(r, _) ->
+      let pth = req_path(r)
+      let file_path = static_path(dir, pth)
+      case mongoose.read_file(file_path):
+        mongoose.Err(_) -> Rejected(r)
+        mongoose.Ok(content) ->
+          set_response(c, 200, mime_for(file_path), content)
+    other -> other
+
+fn static_path(dir: String, pth: String) -> String:
+  let len = string.length(pth)
+  case len == 0:
+    True -> dir <> "/index.html"
+    False ->
+      case string.char_at(pth, len - 1) == 47:
+        True -> dir <> pth <> "index.html"
+        False -> dir <> pth
+
+fn mime_for(file_path: String) -> String:
+  case file_ext(file_path):
+    "html" -> "text/html; charset=utf-8"
+    "htm" -> "text/html; charset=utf-8"
+    "css" -> "text/css; charset=utf-8"
+    "js" -> "application/javascript"
+    "json" -> "application/json"
+    "svg" -> "image/svg+xml"
+    "ico" -> "image/x-icon"
+    "txt" -> "text/plain; charset=utf-8"
+    "png" -> "image/png"
+    "jpg" -> "image/jpeg"
+    "jpeg" -> "image/jpeg"
+    "gif" -> "image/gif"
+    "woff" -> "font/woff"
+    "woff2" -> "font/woff2"
+    _ -> "application/octet-stream"
+
+fn file_ext(fp: String) -> String:
+  let len = string.length(fp)
+  let dot = last_dot(fp, len - 1)
+  case dot < 0:
+    True -> ""
+    False -> string.slice(fp, dot + 1, len - dot - 1)
+
+fn last_dot(s: String, i: Int) -> Int:
+  case i < 0:
+    True -> -1
+    False ->
+      case string.char_at(s, i) == 46:
+        True -> i
+        False -> last_dot(s, i - 1)
+
+fn page_base(content: String) -> String:
+  "<!DOCTYPE html><html lang=\"en\"><head>" <> "<meta charset=\"utf-8\">" <> "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" <> "<style>" <> ":root{--g:#6DC230;--gd:#4A9A20;--gdd:#2E6812;--gl:#DFF0C8;--gxl:#EFF8E4;--y:#F2C91A;--r:#ef4444;--text:#1A2818;--text2:#415E38;--text3:#7A9E70;--bg:#F5FCF0;--surf:#fff;--bdr:#C0DCA8;--bdrl:#DCEECB;--sans:'ui-rounded',system-ui,-apple-system,'Segoe UI',sans-serif;--body:system-ui,-apple-system,'Segoe UI',sans-serif}" <> "*{box-sizing:border-box;margin:0;padding:0}" <> "body{font-family:var(--body);background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}" <> ".card{background:var(--surf);border:1.5px solid var(--bdrl);border-radius:18px;padding:3rem 2.5rem;max-width:460px;width:100%;text-align:center;box-shadow:0 2px 24px rgba(30,80,10,.08)}" <> ".code{font-family:var(--sans);font-size:5rem;font-weight:800;line-height:1;letter-spacing:-.04em;margin-bottom:.5rem}" <> ".c404{color:var(--y)}.c500{color:var(--r)}" <> "h1{font-family:var(--sans);font-size:1.6rem;font-weight:800;color:var(--text);letter-spacing:-.03em;margin-bottom:.6rem}" <> "p.msg{color:var(--text2);font-size:.95rem;line-height:1.6;margin-bottom:1.5rem}" <> "a.home{display:inline-block;padding:.55rem 1.4rem;border-radius:8px;background:var(--gl);color:var(--gdd);font-family:var(--sans);font-size:.88rem;font-weight:700;text-decoration:none;border:1px solid var(--bdr)}" <> "a.home:hover{background:var(--gxl)}" <> ".foot{margin-top:1.75rem;font-size:.78rem;color:var(--text3)}" <> ".foot a{color:var(--gd);text-decoration:none;font-weight:500}" <> ".foot a:hover{text-decoration:underline}" <> "</style></head><body><div class=\"card\">" <> content <> "</div></body></html>"
+
+fn not_found_html() -> String:
+  let body = "<p class=\"code c404\">404</p>" <> "<h1>Page not found</h1>" <> "<p class=\"msg\">No route matched this path. Check the URL or go back home.</p>" <> "<a class=\"home\" href=\"/\">Go home</a>" <> "<p class=\"foot\"><a href=\"https://github.com/NikolasSkyl/toucan\">Toucan</a> v" <> version.toucan <> "</p>"
+  page_base(body)
+
+fn error_html() -> String:
+  let body = "<p class=\"code c500\">500</p>" <> "<h1>Internal server error</h1>" <> "<p class=\"msg\">Something went wrong on our end. Please try again later.</p>" <> "<a class=\"home\" href=\"/\">Go home</a>" <> "<p class=\"foot\"><a href=\"https://github.com/NikolasSkyl/toucan\">Toucan</a> v" <> version.toucan <> "</p>"
+  page_base(body)
+
+fn landing_html() -> String:
+  "<!DOCTYPE html><html lang=\"en\"><head>" <> "<meta charset=\"utf-8\">" <> "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">" <> "<title>Welcome — Toucan</title>" <> "<style>" <> ":root{--g:#6DC230;--gd:#4A9A20;--gdd:#2E6812;--gl:#DFF0C8;--gxl:#EFF8E4;--gxxl:#F5FCF0;--y:#F2C91A;--text:#1A2818;--text2:#415E38;--text3:#7A9E70;--bg:#F5FCF0;--surf:#fff;--bdr:#C0DCA8;--bdrl:#DCEECB;--sans:'ui-rounded',system-ui,-apple-system,'Segoe UI',sans-serif;--body:system-ui,-apple-system,'Segoe UI',sans-serif;--mono:'ui-monospace','SF Mono','Cascadia Code','Fira Mono',Consolas,monospace}" <> "*{box-sizing:border-box;margin:0;padding:0}" <> "body{font-family:var(--body);background:var(--bg);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem}" <> ".card{background:var(--surf);border:1.5px solid var(--bdrl);border-radius:18px;padding:3rem 2.5rem;max-width:540px;width:100%;text-align:center;box-shadow:0 2px 24px rgba(30,80,10,.08)}" <> "img.logo{width:150px;height:auto;margin:0 auto 1.2rem;filter:drop-shadow(0 4px 14px rgba(60,140,20,.2))}" <> "h1{font-family:var(--sans);font-size:2.8rem;font-weight:800;color:var(--text);letter-spacing:-.04em;line-height:1;margin-bottom:.35rem}" <> ".tagline{color:var(--text2);font-size:.97rem;margin-bottom:.9rem}" <> ".welcome{font-family:var(--sans);font-size:1.05rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;background:linear-gradient(90deg,#6DC230,#F2C91A,#f97316);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:.3rem}" <> ".badges{display:flex;gap:.5rem;justify-content:center;flex-wrap:wrap;margin-top:.75rem;margin-bottom:2rem}" <> ".version{display:inline-block;background:var(--gl);color:var(--gdd);border:1px solid var(--bdr);border-radius:999px;padding:.2rem .75rem;font-size:.73rem;font-family:var(--sans);font-weight:700;letter-spacing:.04em}" <> "hr{border:none;border-top:1px solid var(--bdrl);margin-bottom:1.6rem}" <> ".section-title{font-family:var(--sans);font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gd);margin-bottom:.6rem}" <> ".hint{color:var(--text2);font-size:.92rem;line-height:1.6;margin-bottom:1.25rem}" <> ".hint code{font-family:var(--mono);font-size:.83em;background:var(--gxl);color:var(--gdd);padding:.1em .4em;border-radius:4px;border:1px solid var(--bdrl)}" <> "img.example{width:100%;border-radius:10px;margin-bottom:1.75rem;box-shadow:0 2px 16px rgba(30,80,10,.10)}" <> ".links{font-size:.8rem;color:var(--text3)}" <> ".links a{color:var(--gd);text-decoration:none;font-weight:500}" <> ".links a:hover{text-decoration:underline}" <> "</style></head><body>" <> "<div class=\"card\">" <> "<img class=\"logo\" src=\"https://raw.githubusercontent.com/NikolasSkyl/toucan/refs/heads/main/assets/toucan.png\" alt=\"Toucan\">" <> "<p class=\"welcome\">Welcome to</p>" <> "<h1>Toucan</h1>" <> "<p class=\"tagline\">A micro webframework for Donna Language</p>" <> "<div class=\"badges\">" <> "<span class=\"version\">toucan v" <> version.toucan <> "</span>" <> "<span class=\"version\">donna v" <> version.donna <> "</span>" <> "</div>" <> "<hr>" <> "<p class=\"section-title\">Add your first route</p>" <> "<p class=\"hint\">You're seeing this because no route is registered for <code>/</code>. Add one to replace this page:</p>" <> "<img class=\"example\" src=\"https://raw.githubusercontent.com/NikolasSkyl/toucan/refs/heads/main/assets/snippet.png\" alt=\"Toucan example\">" <> "<p class=\"links\">" <> "<a href=\"https://github.com/NikolasSkyl/toucan\">GitHub</a>" <> " &nbsp;·&nbsp; " <> "<a href=\"https://nikolasskyl.github.io/toucan\">Docs</a>" <> "</p>" <> "</div>" <> "</body></html>"
+
+/// Respond with a 302 redirect to `url`.
+pub fn redirect(c: Ctx, url: String) -> Ctx:
+  case c:
+    Active(_, _) ->
+      Matched(
+        Res(302, "text/plain; charset=utf-8", "", "Location: " <> url <> "\r\n")
+      )
+    other -> other
+
+/// Start the HTTP server and run `handler` for every request.  Blocks forever.
+///
+/// ```donna
+/// import toucan
+///
+/// pub fn main() -> Nil:
+///   toucan.serve(router, 8080)
+///
+/// fn router(c: toucan.Ctx) -> toucan.Ctx:
+///   c
+///   |> toucan.try(home)
+///   |> toucan.not_found
+/// ```
+pub fn serve(handler: fn(Ctx) -> Ctx, port: Int) -> Nil:
+  case mongoose.start(port):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(server) ->
+      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      event_loop(server, handler)
+
+/// Start the HTTP server with shared application state.
+///
+/// ```donna
+/// pub fn main() -> Nil:
+///   toucan.serve_with(db, router, 8080)
+///
+/// fn router(c: toucan.Ctx, db: sqlite.Db) -> toucan.Ctx:
+///   c
+///   |> toucan.try_with(db, index)
+///   |> toucan.not_found
+/// ```
+pub fn serve_with(state: a, handler: fn(Ctx, a) -> Ctx, port: Int) -> Nil:
+  case mongoose.start(port):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(server) ->
+      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      event_loop_with(server, state, handler)
+
+/// Start the HTTP server with a request logger.
+///
+/// Pass `logger.Verbose` to print coloured request lines, or `logger.Silent`
+/// for production deployments with no stdout output.
+pub fn serve_logged(
+  handler: fn(Ctx) -> Ctx,
+  port: Int,
+  level: logger.Level
+) -> Nil:
+  case mongoose.start(port):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(server) ->
+      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      event_loop_logged(server, handler, level)
+
+/// Start the HTTP server with shared state and a request logger.
+pub fn serve_with_logged(
+  state: a,
+  handler: fn(Ctx, a) -> Ctx,
+  port: Int,
+  level: logger.Level
+) -> Nil:
+  case mongoose.start(port):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(server) ->
+      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      event_loop_with_logged(server, state, handler, level)
+
+/// Start an HTTP + WebSocket chat server.
+///
+/// Like `serve_ws` but designed for multi-client messaging: each new
+/// WebSocket client receives `"#" <> conn_id` so it knows its own ID, and
+/// the return value of `ws` is **broadcast** to every connected client.
+/// Return `""` to send nothing.
+///
+/// ```donna
+/// pub fn main() -> Nil:
+///   toucan.serve_chat(router, on_message, 8080)
+///
+/// fn on_message(conn_id: String, msg: String) -> String:
+///   conn_id <> "|" <> msg
+/// ```
+pub fn serve_chat(
+  handler: fn(Ctx) -> Ctx,
+  ws: fn(String, String) -> String,
+  port: Int
+) -> Nil:
+  case mongoose.start(port):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(server) ->
+      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      chat_event_loop(server, handler, ws)
+
+fn chat_event_loop(
+  server: mongoose.Server,
+  handler: fn(Ctx) -> Ctx,
+  ws: fn(String, String) -> String
+) -> Nil:
+  case mongoose.accept_event(server):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(ev) ->
+      case ev:
+        mongoose.Http(req) ->
+          let c = Active(
+            Req(
+              mongoose.method(req),
+              mongoose.path(req),
+              mongoose.query(req),
+              mongoose.content_type(req),
+              mongoose.headers(req),
+              mongoose.body(req)
+            ),
+            []
+          )
+          dispatch(server, handler(c))
+        mongoose.WsOpen(conn_id, _) ->
+          mongoose.ws_send(server, conn_id, "#" <> conn_id)
+        mongoose.WsMsg(conn_id, data) ->
+          let reply = ws(conn_id, data)
+          case string.is_empty(reply):
+            True -> Nil
+            False -> mongoose.ws_broadcast(server, reply)
+        mongoose.WsClose(_) -> Nil
+  chat_event_loop(server, handler, ws)
+
+/// Start an HTTP + WebSocket chat server with shared state.
+///
+/// Like `serve_chat` but threads a state value through every HTTP handler
+/// call. Useful for passing a session store, database connection, or any
+/// other shared value alongside WebSocket chat.
+///
+/// ```donna
+/// pub fn main() -> Nil:
+///   toucan.serve_with_chat(session.new_store(), router, on_message, 8080)
+///
+/// fn router(c: toucan.Ctx, store: session.Store) -> toucan.Ctx:
+///   let sid = session.start(c, store)
+///   c |> toucan.try_with(#(store, sid), home) |> toucan.not_found
+/// ```
+pub fn serve_with_chat(
+  state: a,
+  handler: fn(Ctx, a) -> Ctx,
+  ws: fn(String, String) -> String,
+  port: Int
+) -> Nil:
+  case mongoose.start(port):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(server) ->
+      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      chat_with_event_loop(server, state, handler, ws)
+
+fn chat_with_event_loop(
+  server: mongoose.Server,
+  state: a,
+  handler: fn(Ctx, a) -> Ctx,
+  ws: fn(String, String) -> String
+) -> Nil:
+  case mongoose.accept_event(server):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(ev) ->
+      case ev:
+        mongoose.Http(req) ->
+          let c = Active(
+            Req(
+              mongoose.method(req),
+              mongoose.path(req),
+              mongoose.query(req),
+              mongoose.content_type(req),
+              mongoose.headers(req),
+              mongoose.body(req)
+            ),
+            []
+          )
+          dispatch(server, handler(c, state))
+        mongoose.WsOpen(conn_id, _) ->
+          mongoose.ws_send(server, conn_id, "#" <> conn_id)
+        mongoose.WsMsg(conn_id, data) ->
+          let reply = ws(conn_id, data)
+          case string.is_empty(reply):
+            True -> Nil
+            False -> mongoose.ws_broadcast(server, reply)
+        mongoose.WsClose(_) -> Nil
+  chat_with_event_loop(server, state, handler, ws)
+
+/// Start an HTTP + WebSocket server.
+///
+/// `handler` is called for every HTTP request. `ws` is called for every
+/// WebSocket message with `(conn_id, message)` and should return the reply,
+/// or `""` to send no reply.
+///
+/// ```donna
+/// pub fn main() -> Nil:
+///   toucan.serve_ws(router, ws_echo, 8080)
+///
+/// fn ws_echo(conn_id: String, msg: String) -> String:
+///   msg
+/// ```
+pub fn serve_ws(
+  handler: fn(Ctx) -> Ctx,
+  ws: fn(String, String) -> String,
+  port: Int
+) -> Nil:
+  case mongoose.start(port):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(server) ->
+      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      ws_event_loop(server, handler, ws)
+
+fn event_loop(server: mongoose.Server, handler: fn(Ctx) -> Ctx) -> Nil:
+  case mongoose.accept(server):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(req) ->
+      let pth = mongoose.path(req)
+      let c = Active(
+        Req(
+          mongoose.method(req),
+          pth,
+          mongoose.query(req),
+          mongoose.content_type(req),
+          mongoose.headers(req),
+          mongoose.body(req)
+        ),
+        []
+      )
+      dispatch(server, handler(c))
+  event_loop(server, handler)
+
+fn event_loop_with(
+  server: mongoose.Server,
+  state: a,
+  handler: fn(Ctx, a) -> Ctx
+) -> Nil:
+  case mongoose.accept(server):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(req) ->
+      let pth = mongoose.path(req)
+      let c = Active(
+        Req(
+          mongoose.method(req),
+          pth,
+          mongoose.query(req),
+          mongoose.content_type(req),
+          mongoose.headers(req),
+          mongoose.body(req)
+        ),
+        []
+      )
+      dispatch(server, handler(c, state))
+  event_loop_with(server, state, handler)
+
+fn ctx_status(c: Ctx) -> Int:
+  case c:
+    Matched(Res(s, _, _, _)) -> s
+    Active(_, _) -> 404
+    Rejected(_) -> 404
+
+fn event_loop_logged(
+  server: mongoose.Server,
+  handler: fn(Ctx) -> Ctx,
+  level: logger.Level
+) -> Nil:
+  case mongoose.accept(server):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(req) ->
+      let method = mongoose.method(req)
+      let pth = mongoose.path(req)
+      let c = Active(
+        Req(
+          method,
+          pth,
+          mongoose.query(req),
+          mongoose.content_type(req),
+          mongoose.headers(req),
+          mongoose.body(req)
+        ),
+        []
+      )
+      let result = handler(c)
+      let status = ctx_status(result)
+      dispatch(server, result)
+      logger.log(level, method, pth, status)
+  event_loop_logged(server, handler, level)
+
+fn event_loop_with_logged(
+  server: mongoose.Server,
+  state: a,
+  handler: fn(Ctx, a) -> Ctx,
+  level: logger.Level
+) -> Nil:
+  case mongoose.accept(server):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(req) ->
+      let method = mongoose.method(req)
+      let pth = mongoose.path(req)
+      let c = Active(
+        Req(
+          method,
+          pth,
+          mongoose.query(req),
+          mongoose.content_type(req),
+          mongoose.headers(req),
+          mongoose.body(req)
+        ),
+        []
+      )
+      let result = handler(c, state)
+      let status = ctx_status(result)
+      dispatch(server, result)
+      logger.log(level, method, pth, status)
+  event_loop_with_logged(server, state, handler, level)
+
+fn ws_event_loop(
+  server: mongoose.Server,
+  handler: fn(Ctx) -> Ctx,
+  ws: fn(String, String) -> String
+) -> Nil:
+  case mongoose.accept_event(server):
+    mongoose.Err(e) -> echo e
+    mongoose.Ok(ev) ->
+      case ev:
+        mongoose.Http(req) ->
+          let c = Active(
+            Req(
+              mongoose.method(req),
+              mongoose.path(req),
+              mongoose.query(req),
+              mongoose.content_type(req),
+              mongoose.headers(req),
+              mongoose.body(req)
+            ),
+            []
+          )
+          dispatch(server, handler(c))
+        mongoose.WsOpen(_, _) -> Nil
+        mongoose.WsMsg(conn_id, data) ->
+          let reply = ws(conn_id, data)
+          case string.is_empty(reply):
+            True -> Nil
+            False -> mongoose.ws_send(server, conn_id, reply)
+        mongoose.WsClose(_) -> Nil
+  ws_event_loop(server, handler, ws)
+
+fn sec_hdrs() -> String:
+  "X-Content-Type-Options: nosniff\r\n" <> "X-Frame-Options: DENY\r\n" <> "Referrer-Policy: strict-origin-when-cross-origin\r\n"
+
+fn dispatch(server: mongoose.Server, c: Ctx) -> Nil:
+  case c:
+    Matched(Res(s, ct, bdy, hdrs)) ->
+      mongoose.respond_with_headers(server, s, ct, hdrs <> sec_hdrs(), bdy)
+    Active(_, _) ->
+      mongoose.respond_with_headers(
+        server,
+        404,
+        "text/html; charset=utf-8",
+        sec_hdrs(),
+        not_found_html()
+      )
+    Rejected(_) ->
+      mongoose.respond_with_headers(
+        server,
+        404,
+        "text/html; charset=utf-8",
+        sec_hdrs(),
+        not_found_html()
+      )
+
+/// Build an Active context from raw request strings.
+pub fn new_ctx(
+  m: String,
+  p: String,
+  q: String,
+  ct: String,
+  hdrs: String,
+  bdy: String
+) -> Ctx:
+  Active(Req(m, p, q, ct, hdrs, bdy), [])

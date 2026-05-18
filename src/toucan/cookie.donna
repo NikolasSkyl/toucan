@@ -1,0 +1,88 @@
+import donna/string
+
+/// Parse a `Cookie` header value into key-value pairs.
+///
+/// `"session=abc; theme=dark"` → `[#("session", "abc"), #("theme", "dark")]`
+pub fn parse(header_value: String) -> List(#(String, String)):
+  case string.length(header_value) == 0:
+    True -> []
+    False -> parse_cookies(header_value, 0, string.length(header_value), 0, [])
+
+/// Look up a cookie by name, returning `""` if absent.
+pub fn get(cookies: List(#(String, String)), name: String) -> String:
+  case cookies:
+    [] -> ""
+    [#(k, v), ..rest] ->
+      case k == name:
+        True -> v
+        False -> get(rest, name)
+
+fn parse_cookies(
+  s: String,
+  i: Int,
+  len: Int,
+  seg_start: Int,
+  acc: List(#(String, String))
+) -> List(#(String, String)):
+  case i >= len:
+    True ->
+      let pair = trim(string.slice(s, seg_start, i - seg_start))
+      reverse_list([parse_pair(pair), ..acc])
+    False ->
+      case string.char_at(s, i) == 59:
+        True ->
+          let pair = trim(string.slice(s, seg_start, i - seg_start))
+          parse_cookies(s, i + 1, len, i + 1, [parse_pair(pair), ..acc])
+        False ->
+          parse_cookies(s, i + 1, len, seg_start, acc)
+
+fn parse_pair(s: String) -> #(String, String):
+  let len = string.length(s)
+  let eq = find_eq(s, 0, len)
+  case eq < 0:
+    True -> #(s, "")
+    False ->
+      #(string.slice(s, 0, eq), string.slice(s, eq + 1, len - eq - 1))
+
+fn find_eq(s: String, i: Int, len: Int) -> Int:
+  case i >= len:
+    True -> -1
+    False ->
+      case string.char_at(s, i) == 61:
+        True -> i
+        False -> find_eq(s, i + 1, len)
+
+fn trim(s: String) -> String:
+  let len = string.length(s)
+  let start = trim_start(s, 0, len)
+  let end = trim_end(s, len - 1, start)
+  case end < start:
+    True -> ""
+    False -> string.slice(s, start, end - start + 1)
+
+fn trim_start(s: String, i: Int, len: Int) -> Int:
+  case i >= len:
+    True -> i
+    False ->
+      case string.char_at(s, i) == 32:
+        True -> trim_start(s, i + 1, len)
+        False -> i
+
+fn trim_end(s: String, i: Int, min_i: Int) -> Int:
+  case i < min_i:
+    True -> min_i
+    False ->
+      case string.char_at(s, i) == 32:
+        True -> trim_end(s, i - 1, min_i)
+        False -> i
+
+fn reverse_list(lst: List(#(String, String))) -> List(#(String, String)):
+  reverse_acc(lst, [])
+
+fn reverse_acc(
+  lst: List(#(String, String)),
+  acc: List(#(String, String))
+) -> List(#(String, String)):
+  case lst:
+    [] -> acc
+    [h, ..t] -> reverse_acc(t, [h, ..acc])

@@ -1,0 +1,269 @@
+import toucan
+import mustache
+import mongoose
+import donna/string
+import donna/files
+import donna/list
+
+@external("c", "donna_save_data_url_file")
+fn save_data_url_file(path: String, data: String) -> Int
+
+@external("c", "donna_file_data_url")
+fn file_data_url(path: String) -> String
+
+fn read_template(name: String) -> String:
+  case mongoose.read_file("priv/templates/" <> name <> ".mustache"):
+    mongoose.Err(_) -> "<!-- template missing: " <> name <> " -->"
+    mongoose.Ok(t)  -> t
+
+fn extract_boundary(ct: String) -> String:
+  let key = "boundary="
+  let idx = string.index_of(ct, key)
+  case idx < 0:
+    True -> ""
+    False ->
+      let start = idx + string.length(key)
+      string.slice(ct, start, string.length(ct) - start)
+
+fn extract_filename(headers: String) -> String:
+  let key = "filename=\""
+  let idx = string.index_of(headers, key)
+  case idx < 0:
+    True -> "upload.txt"
+    False ->
+      let start = idx + string.length(key)
+      let end_idx = string.index_of_from(headers, "\"", start)
+      case end_idx < 0:
+        True -> "upload.txt"
+        False -> string.slice(headers, start, end_idx - start)
+
+fn parse_multipart(body: String, boundary: String) -> #(String, String):
+  let delim       = "--" <> boundary
+  let delim_len   = string.length(delim)
+  let part_start  = string.index_of(body, delim)
+  case part_start < 0:
+    True -> #("upload.txt", "")
+    False ->
+      let after_delim = part_start + delim_len + 2
+      let header_end  = string.index_of_from(body, "\r\n\r\n", after_delim)
+      case header_end < 0:
+        True -> #("upload.txt", "")
+        False ->
+          let hdr_block    = string.slice(body, after_delim, header_end - after_delim)
+          let filename     = extract_filename(hdr_block)
+          let content_start = header_end + 4
+          let end_marker   = "\r\n" <> delim
+          let end_idx      = string.index_of_from(body, end_marker, content_start)
+          let content      = case end_idx < 0:
+            True  -> string.slice(body, content_start, string.length(body) - content_start)
+            False -> string.slice(body, content_start, end_idx - content_start)
+          #(filename, content)
+
+fn parse_multipart_field(body: String, boundary: String, field: String) -> String:
+  parse_multipart_field_from(body, boundary, field, 0)
+
+fn parse_multipart_field_from(body: String, boundary: String, field: String, start: Int) -> String:
+  let delim      = "--" <> boundary
+  let delim_len  = string.length(delim)
+  let part_start = string.index_of_from(body, delim, start)
+  case part_start < 0:
+    True -> ""
+    False ->
+      let after_delim = part_start + delim_len + 2
+      let header_end  = string.index_of_from(body, "\r\n\r\n", after_delim)
+      case header_end < 0:
+        True -> ""
+        False ->
+          let hdr_block = string.slice(body, after_delim, header_end - after_delim)
+          let needle    = "name=\"" <> field <> "\""
+          let content_start = header_end + 4
+          let end_marker = "\r\n" <> delim
+          let end_idx = string.index_of_from(body, end_marker, content_start)
+          let next_start = case end_idx < 0:
+            True  -> string.length(body)
+            False -> end_idx + 2
+          case string.index_of(hdr_block, needle) < 0:
+            True -> parse_multipart_field_from(body, boundary, field, next_start)
+            False ->
+              case end_idx < 0:
+                True  -> string.slice(body, content_start, string.length(body) - content_start)
+                False -> string.slice(body, content_start, end_idx - content_start)
+
+fn safe_filename(name: String) -> String:
+  string.replace(string.replace(name, "/", "_"), "..", "_")
+
+fn is_image_name(name: String) -> Bool:
+  case files.extension(name):
+    ".png"  -> True
+    ".PNG"  -> True
+    ".jpg"  -> True
+    ".JPG"  -> True
+    ".jpeg" -> True
+    ".JPEG" -> True
+    ".gif"  -> True
+    ".GIF"  -> True
+    ".webp" -> True
+    ".WEBP" -> True
+    _       -> False
+
+fn is_image_data(data: String) -> Bool:
+  string.index_of(data, "data:image/") == 0
+
+fn is_image_too_large(data: String) -> Bool:
+  string.length(data) > 450000
+
+fn image_src(name: String) -> String:
+  case is_image_name(name):
+    True  -> file_data_url("priv/uploads/" <> name)
+    False -> ""
+
+fn list_uploads() -> List(List(mustache.Value)):
+  let names = files.list_dir("priv/uploads")
+  names_to_view(names)
+
+fn names_to_view(names: List(String)) -> List(List(mustache.Value)):
+  case names:
+    []           -> []
+    [n, ..rest]  -> [[
+      mustache.text("name", n),
+      mustache.bool("is_image", is_image_name(n)),
+      mustache.text("image_src", image_src(n))
+    ], ..names_to_view(rest)]
+
+fn render_index(success: String, filename: String, error: String) -> String:
+  let uploads = list_uploads()
+  mustache.render_view(read_template("index"), [
+    mustache.bool("success",   success != ""),
+    mustache.text("filename",  filename),
+    mustache.bool("error",     error != ""),
+    mustache.text("error",     error),
+    mustache.bool("has_files", uploads != []),
+    mustache.list("files",     uploads)
+  ])
+
+fn handler(c: toucan.Ctx) -> toucan.Ctx:
+  c
+  |> toucan.try(static_files)
+  |> toucan.try(index)
+  |> toucan.try(upload)
+  |> toucan.try(upload_image)
+  |> toucan.try(view_file)
+  |> toucan.try(delete_file)
+  |> toucan.not_found
+
+fn static_files(c: toucan.Ctx) -> toucan.Ctx:
+  toucan.static_dir(c, "priv")
+
+fn index(c: toucan.Ctx) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/")
+  |> toucan.html(render_index("", "", ""))
+
+fn upload(c: toucan.Ctx) -> toucan.Ctx:
+  c
+  |> toucan.post
+  |> toucan.path("/upload")
+  |> do_upload
+
+fn do_upload(c: toucan.Ctx) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let ct       = toucan.content_type_of(c)
+      let boundary = extract_boundary(ct)
+      case string.is_empty(boundary):
+        True ->
+          toucan.html(c, render_index("", "", "Not a multipart/form-data request"))
+        False ->
+          let body = toucan.body_of(c)
+          let #(raw_name, content) = parse_multipart(body, boundary)
+          let filename = safe_filename(raw_name)
+          case string.is_empty(filename):
+            True ->
+              toucan.html(c, render_index("", "", "No file selected"))
+            False ->
+              let path = "priv/uploads/" <> filename
+              let _ = files.write(path, content)
+              toucan.html(c, render_index("ok", filename, ""))
+    other -> other
+
+fn upload_image(c: toucan.Ctx) -> toucan.Ctx:
+  c
+  |> toucan.post
+  |> toucan.path("/upload-image")
+  |> do_upload_image
+
+fn do_upload_image(c: toucan.Ctx) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let ct       = toucan.content_type_of(c)
+      let boundary = extract_boundary(ct)
+      case string.is_empty(boundary):
+        True ->
+          toucan.html(c, render_index("", "", "Not a multipart/form-data request"))
+        False ->
+          let body     = toucan.body_of(c)
+          let raw_name = parse_multipart_field(body, boundary, "image_name")
+          let data     = parse_multipart_field(body, boundary, "image_data")
+          let filename = safe_filename(raw_name)
+          case string.is_empty(filename):
+            True ->
+              toucan.html(c, render_index("", "", "No image selected"))
+            False ->
+              case is_image_name(filename):
+                False ->
+                  toucan.html(c, render_index("", "", "Please choose a PNG, JPEG, GIF, or WebP image"))
+                True ->
+                  case is_image_data(data):
+                    False ->
+                      toucan.html(c, render_index("", "", "Could not read image data"))
+                    True ->
+                      case is_image_too_large(data):
+                        True ->
+                          toucan.html(c, render_index("", "", "Image is too large. Please choose a smaller image."))
+                        False ->
+                          case save_data_url_file("priv/uploads/" <> filename, data) == 0:
+                            True ->
+                              toucan.html(c, render_index("ok", filename, ""))
+                            False ->
+                              toucan.html(c, render_index("", "", "Could not save image"))
+    other -> other
+
+fn view_file(c: toucan.Ctx) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/view/:name")
+  |> do_view
+
+fn do_view(c: toucan.Ctx) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let name    = safe_filename(toucan.param(c, "name"))
+      let content = case is_image_name(name):
+        True  -> file_data_url("priv/uploads/" <> name)
+        False -> files.read("priv/uploads/" <> name)
+      toucan.html(c, mustache.render_view(read_template("view"), [
+        mustache.text("filename", name),
+        mustache.text("content",  content),
+        mustache.bool("is_image", is_image_name(name)),
+        mustache.text("image_src", content)
+      ]))
+    other -> other
+
+fn delete_file(c: toucan.Ctx) -> toucan.Ctx:
+  c
+  |> toucan.post
+  |> toucan.path("/delete/:name")
+  |> do_delete
+
+fn do_delete(c: toucan.Ctx) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let name = safe_filename(toucan.param(c, "name"))
+      let _ = files.delete("priv/uploads/" <> name)
+      toucan.redirect(c, "/")
+    other -> other
+
+pub fn main() -> Nil:
+  let _ = files.mkdir("priv/uploads")
+  toucan.serve(handler, 8000)

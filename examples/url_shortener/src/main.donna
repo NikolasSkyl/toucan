@@ -1,0 +1,194 @@
+import toucan
+import mustache
+import sqlite
+import mongoose
+import donna/string
+
+@external("c", "donna_random_slug")
+fn donna_random_slug() -> String
+
+fn read_template(name: String) -> String:
+  case mongoose.read_file("priv/templates/" <> name <> ".mustache"):
+    mongoose.Err(_) -> "<!-- template missing: " <> name <> " -->"
+    mongoose.Ok(t)  -> t
+
+fn db_init(path: String) -> Nil:
+  case sqlite.open(path):
+    sqlite.Err(_) -> Nil
+    sqlite.Ok(db) ->
+      let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS links (slug TEXT PRIMARY KEY, url TEXT NOT NULL, created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')))")
+      sqlite.close(db)
+
+fn db_all(path: String) -> List(List(sqlite.Value)):
+  case sqlite.open(path):
+    sqlite.Err(_) -> []
+    sqlite.Ok(db) ->
+      case sqlite.query(db, "SELECT slug, url FROM links ORDER BY created_at DESC LIMIT 20"):
+        sqlite.Err(_) ->
+          sqlite.close(db)
+          []
+        sqlite.Ok(rows) ->
+          sqlite.close(db)
+          rows
+
+fn db_find(path: String, slug: String) -> String:
+  case sqlite.open(path):
+    sqlite.Err(_) -> ""
+    sqlite.Ok(db) ->
+      case sqlite.prepare(db, "SELECT url FROM links WHERE slug = ?"):
+        sqlite.Err(_) ->
+          sqlite.close(db)
+          ""
+        sqlite.Ok(stmt) ->
+          let _ = sqlite.bind_text(stmt, 1, slug)
+          case sqlite.step(stmt):
+            sqlite.Err(_) ->
+              sqlite.finalize(stmt)
+              sqlite.close(db)
+              ""
+            sqlite.Ok(row) ->
+              let url = cell_str(row_nth(row, 0))
+              sqlite.finalize(stmt)
+              sqlite.close(db)
+              url
+
+fn db_insert(path: String, slug: String, url: String) -> Nil:
+  case sqlite.open(path):
+    sqlite.Err(_) -> Nil
+    sqlite.Ok(db) ->
+      case sqlite.prepare(db, "INSERT INTO links (slug, url) VALUES (?, ?)"):
+        sqlite.Err(_) -> sqlite.close(db)
+        sqlite.Ok(stmt) ->
+          let _ = sqlite.bind_text(stmt, 1, slug)
+          let _ = sqlite.bind_text(stmt, 2, url)
+          let _ = sqlite.step(stmt)
+          sqlite.finalize(stmt)
+          sqlite.close(db)
+
+fn db_delete(path: String, slug: String) -> Nil:
+  case sqlite.open(path):
+    sqlite.Err(_) -> Nil
+    sqlite.Ok(db) ->
+      case sqlite.prepare(db, "DELETE FROM links WHERE slug = ?"):
+        sqlite.Err(_) -> sqlite.close(db)
+        sqlite.Ok(stmt) ->
+          let _ = sqlite.bind_text(stmt, 1, slug)
+          let _ = sqlite.step(stmt)
+          sqlite.finalize(stmt)
+          sqlite.close(db)
+
+fn cell_str(v: sqlite.Value) -> String:
+  case v:
+    sqlite.Text(s)  -> s
+    sqlite.Int(n)   -> string.from_int(n)
+    sqlite.Float(_) -> ""
+    sqlite.Blob(s)  -> s
+    sqlite.Null     -> ""
+
+fn row_nth(row: List(sqlite.Value), n: Int) -> sqlite.Value:
+  case n:
+    0 ->
+      case row:
+        []      -> sqlite.Null
+        [v, ..] -> v
+    _ ->
+      case row:
+        []          -> sqlite.Null
+        [_, ..rest] -> row_nth(rest, n - 1)
+
+fn rows_to_view(rows: List(List(sqlite.Value))) -> List(List(mustache.Value)):
+  case rows:
+    []           -> []
+    [r, ..rest]  -> [row_to_view(r), ..rows_to_view(rest)]
+
+fn row_to_view(row: List(sqlite.Value)) -> List(mustache.Value):
+  [
+    mustache.text("slug", cell_str(row_nth(row, 0))),
+    mustache.text("url",  cell_str(row_nth(row, 1)))
+  ]
+
+fn render_index(db: String, created_slug: String, created_url: String, error: String) -> String:
+  let rows = db_all(db)
+  mustache.render_view(read_template("index"), [
+    mustache.bool("created",   created_slug != ""),
+    mustache.text("slug",      created_slug),
+    mustache.text("url",       created_url),
+    mustache.bool("error",     error != ""),
+    mustache.text("error",     error),
+    mustache.bool("has_links", rows != []),
+    mustache.list("links",     rows_to_view(rows))
+  ])
+
+fn handler(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.try(static_files)
+  |> toucan.try_with(db, index)
+  |> toucan.try_with(db, shorten)
+  |> toucan.try_with(db, delete_link)
+  |> toucan.try_with(db, redirect_slug)
+  |> toucan.not_found
+
+fn static_files(c: toucan.Ctx) -> toucan.Ctx:
+  toucan.static_dir(c, "priv")
+
+fn index(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/")
+  |> toucan.html(render_index(db, "", "", ""))
+
+fn shorten(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.post
+  |> toucan.path("/shorten")
+  |> do_shorten(db)
+
+fn do_shorten(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let url = string.trim(toucan.form_field(c, "url"))
+      case string.is_empty(url):
+        True ->
+          toucan.html(c, render_index(db, "", "", "Please enter a URL"))
+        False ->
+          case string.starts_with(url, "http://") || string.starts_with(url, "https://"):
+            False ->
+              toucan.html(c, render_index(db, "", "", "URL must start with http:// or https://"))
+            True ->
+              let slug = donna_random_slug()
+              let _ = db_insert(db, slug, url)
+              toucan.html(c, render_index(db, slug, url, ""))
+    other -> other
+
+fn delete_link(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.post
+  |> toucan.path("/delete/:slug")
+  |> do_delete(db)
+
+fn do_delete(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let _ = db_delete(db, toucan.param(c, "slug"))
+      toucan.redirect(c, "/")
+    other -> other
+
+fn redirect_slug(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/:slug")
+  |> do_redirect(db)
+
+fn do_redirect(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let slug = toucan.param(c, "slug")
+      let url  = db_find(db, slug)
+      case string.is_empty(url):
+        True  -> toucan.respond(c, 404, "text/plain", "Short link not found")
+        False -> toucan.redirect(c, url)
+    other -> other
+
+pub fn main() -> Nil:
+  db_init("links.db")
+  toucan.serve_with("links.db", handler, 8000)

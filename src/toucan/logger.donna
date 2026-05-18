@@ -1,0 +1,67 @@
+//// Request logger for Toucan.
+////
+//// ```donna
+//// import toucan
+//// import toucan/logger
+////
+//// pub fn main() -> Nil:
+//// toucan.serve_logged(router, 8080, logger.Verbose)
+////
+//// // Silence logs in production
+//// pub fn main() -> Nil:
+//// toucan.serve_logged(router, 8080, logger.Silent)
+//// ```
+
+import donna/string
+
+pub const reset = "\u{001b}[0m"
+pub const bold = "\u{001b}[1m"
+pub const dim = "\u{001b}[2m"
+pub const italic = "\u{001b}[3m"
+pub const red = "\u{001b}[31m"
+pub const green = "\u{001b}[32m"
+pub const yellow = "\u{001b}[33m"
+pub const cyan = "\u{001b}[36m"
+pub const magenta = "\u{001b}[35m"
+pub const bold_red = "\u{001b}[1;31m"
+pub const orange = "\u{001b}[38;5;208m"
+
+/// Controls whether requests are printed to stdout.
+pub type Level:
+  Verbose
+  Silent
+
+/// Wrap `txt` with an ANSI code and reset.
+pub fn paint(code: String, txt: String) -> String:
+  code <> txt <> reset
+
+/// Log one request line when level is `Verbose`.
+pub fn log(level: Level, method: String, pth: String, status: Int) -> Nil:
+  case level:
+    Silent -> Nil
+    Verbose ->
+      echo paint(dim, "→") <> " " <> colored_method(method) <> " " <> paint(dim, pth) <> " " <> colored_status(status)
+
+fn colored_method(m: String) -> String:
+  case m:
+    "GET" -> paint(green, m)
+    "POST" -> paint(cyan, m)
+    "PUT" -> paint(yellow, m)
+    "DELETE" -> paint(red, m)
+    "PATCH" -> paint(magenta, m)
+    _ -> paint(bold, m)
+
+fn colored_status(s: Int) -> String:
+  let txt = string.from_int(s)
+  case s >= 500:
+    True -> paint(bold_red, txt)
+    False ->
+      case s >= 400:
+        True -> paint(red, txt)
+        False ->
+          case s >= 300:
+            True -> paint(yellow, txt)
+            False ->
+              case s >= 200:
+                True -> paint(green, txt)
+                False -> txt

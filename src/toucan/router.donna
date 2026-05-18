@@ -1,0 +1,86 @@
+import donna/string
+
+/// Match `pattern` against `actual` path, extracting `:name` captures.
+///
+/// Returns `#(True, params)` on match, `#(False, [])` on mismatch.
+pub fn match_path(
+  pattern: String,
+  actual: String
+) -> #(Bool, List(#(String, String))):
+  let pat_segs = split_path(pattern)
+  let act_segs = split_path(actual)
+  match_segments(pat_segs, act_segs, [])
+
+/// Return True if `s` starts with `prefix`.
+pub fn has_prefix(s: String, prefix: String) -> Bool:
+  let sl = string.length(s)
+  let pl = string.length(prefix)
+  case pl > sl:
+    True -> False
+    False -> string.slice(s, 0, pl) == prefix
+
+fn match_segments(
+  pat: List(String),
+  act: List(String),
+  params: List(#(String, String))
+) -> #(Bool, List(#(String, String))):
+  case pat:
+    [] ->
+      case act:
+        [] -> #(True, params)
+        _ -> #(False, [])
+    [p, ..prest] ->
+      case act:
+        [] -> #(False, [])
+        [a, ..arest] ->
+          case is_capture(p):
+            True ->
+              let key = string.slice(p, 1, string.length(p) - 1)
+              match_segments(prest, arest, [#(key, a), ..params])
+            False ->
+              case p == a:
+                True -> match_segments(prest, arest, params)
+                False -> #(False, [])
+
+fn is_capture(seg: String) -> Bool:
+  case string.length(seg) > 0:
+    False -> False
+    True -> string.char_at(seg, 0) == 58
+
+fn split_path(p: String) -> List(String):
+  let len = string.length(p)
+  let start = case len > 0 && string.char_at(p, 0) == 47:
+    True -> 1
+    False -> 0
+  let end = case len > start && string.char_at(p, len - 1) == 47:
+    True -> len - 1
+    False -> len
+  case end <= start:
+    True -> []
+    False -> collect_segments(p, start, end, start, [])
+
+fn collect_segments(
+  s: String,
+  i: Int,
+  end: Int,
+  seg_start: Int,
+  acc: List(String)
+) -> List(String):
+  case i >= end:
+    True ->
+      rev([string.slice(s, seg_start, i - seg_start), ..acc])
+    False ->
+      case string.char_at(s, i) == 47:
+        True ->
+          let seg = string.slice(s, seg_start, i - seg_start)
+          collect_segments(s, i + 1, end, i + 1, [seg, ..acc])
+        False ->
+          collect_segments(s, i + 1, end, seg_start, acc)
+
+fn rev(lst: List(String)) -> List(String):
+  rev_acc(lst, [])
+
+fn rev_acc(lst: List(String), acc: List(String)) -> List(String):
+  case lst:
+    [] -> acc
+    [h, ..t] -> rev_acc(t, [h, ..acc])

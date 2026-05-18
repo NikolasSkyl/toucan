@@ -1,0 +1,129 @@
+import donna/string
+
+/// Parse a query string into a list of key-value pairs.
+///
+/// `"page=1&limit=20"` → `[#("page", "1"), #("limit", "20")]`
+pub fn parse(qs: String) -> List(#(String, String)):
+  case string.length(qs) == 0:
+    True -> []
+    False -> parse_pairs(qs, 0, string.length(qs), 0, [])
+
+/// Look up a key in parsed query params, returning `""` if absent.
+pub fn get(params: List(#(String, String)), key: String) -> String:
+  case params:
+    [] -> ""
+    [#(k, v), ..rest] ->
+      case k == key:
+        True -> v
+        False -> get(rest, key)
+
+fn parse_pairs(
+  s: String,
+  i: Int,
+  len: Int,
+  seg_start: Int,
+  acc: List(#(String, String))
+) -> List(#(String, String)):
+  case i >= len:
+    True ->
+      let pair = string.slice(s, seg_start, i - seg_start)
+      reverse_list([parse_pair(pair), ..acc])
+    False ->
+      case string.char_at(s, i) == 38:
+        True ->
+          let pair = string.slice(s, seg_start, i - seg_start)
+          parse_pairs(s, i + 1, len, i + 1, [parse_pair(pair), ..acc])
+        False ->
+          parse_pairs(s, i + 1, len, seg_start, acc)
+
+/// Decode a URL-encoded string (`+` → space, `%XX` → character).
+pub fn url_decode(s: String) -> String:
+  decode_chars(s, 0, string.length(s), "")
+
+fn decode_chars(s: String, i: Int, len: Int, acc: String) -> String:
+  case i >= len:
+    True -> acc
+    False ->
+      let c = string.char_at(s, i)
+      case c == 43:
+        True -> decode_chars(s, i + 1, len, acc <> " ")
+        False ->
+          case c == 37:
+            True ->
+              case i + 2 < len:
+                True ->
+                  let hi = hex_digit(string.char_at(s, i + 1))
+                  let lo = hex_digit(string.char_at(s, i + 2))
+                  case hi >= 0:
+                    True ->
+                      case lo >= 0:
+                        True ->
+                          decode_chars(
+                            s,
+                            i + 3,
+                            len,
+                            acc <> string.char_from_code(hi * 16 + lo)
+                          )
+                        False ->
+                          decode_chars(
+                            s,
+                            i + 1,
+                            len,
+                            acc <> string.char_str(s, i)
+                          )
+                    False ->
+                      decode_chars(s, i + 1, len, acc <> string.char_str(s, i))
+                False ->
+                  decode_chars(s, i + 1, len, acc <> string.char_str(s, i))
+            False ->
+              decode_chars(s, i + 1, len, acc <> string.char_str(s, i))
+
+fn hex_digit(c: Int) -> Int:
+  case c >= 48:
+    True ->
+      case c <= 57:
+        True -> c - 48
+        False ->
+          case c >= 65:
+            True ->
+              case c <= 70:
+                True -> c - 55
+                False ->
+                  case c >= 97:
+                    True ->
+                      case c <= 102:
+                        True -> c - 87
+                        False -> -1
+                    False -> -1
+            False -> -1
+    False -> -1
+
+fn parse_pair(s: String) -> #(String, String):
+  let len = string.length(s)
+  let eq = find_eq(s, 0, len)
+  case eq < 0:
+    True -> #(url_decode(s), "")
+    False ->
+      #(
+        url_decode(string.slice(s, 0, eq)),
+        url_decode(string.slice(s, eq + 1, len - eq - 1))
+      )
+
+fn find_eq(s: String, i: Int, len: Int) -> Int:
+  case i >= len:
+    True -> -1
+    False ->
+      case string.char_at(s, i) == 61:
+        True -> i
+        False -> find_eq(s, i + 1, len)
+
+fn reverse_list(lst: List(#(String, String))) -> List(#(String, String)):
+  reverse_acc(lst, [])
+
+fn reverse_acc(
+  lst: List(#(String, String)),
+  acc: List(#(String, String))
+) -> List(#(String, String)):
+  case lst:
+    [] -> acc
+    [h, ..t] -> reverse_acc(t, [h, ..acc])

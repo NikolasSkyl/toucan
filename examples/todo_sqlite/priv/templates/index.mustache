@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todos · Toucan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">🦜 toucan / todo_sqlite</div>
+
+    <div class="card">
+      <h1>Todos</h1>
+      <p>{{count}} item(s) — backed by SQLite.</p>
+
+      <form method="post" action="/todos">
+        <div class="field">
+          <input type="text" name="title" placeholder="What needs doing?" autofocus autocomplete="off">
+        </div>
+        <button class="btn btn-full">Add todo</button>
+      </form>
+    </div>
+
+    <div class="card">
+      {{#empty}}
+      <p class="muted">No todos yet. Add one above!</p>
+      {{/empty}}
+
+      <ul class="todo-list">
+        {{#todos}}
+        <li class="todo-item">
+          <form class="inline-form" method="post" action="/todos/{{id}}/toggle">
+            <button class="btn btn-sm btn-ghost">{{check}}</button>
+          </form>
+          <span class="todo-label {{done_class}}">{{title}}</span>
+          <form class="inline-form" method="post" action="/todos/{{id}}/delete">
+            <button class="btn btn-sm btn-danger">✕</button>
+          </form>
+        </li>
+        {{/todos}}
+      </ul>
+    </div>
+  </div>
+</body>
+</html>

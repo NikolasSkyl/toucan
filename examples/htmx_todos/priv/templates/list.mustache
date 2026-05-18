@@ -1,0 +1,16 @@
+{{#todos}}
+<li class="todo-item" id="todo-{{id}}">
+  <button class="btn btn-sm btn-ghost"
+          hx-post="/todos/{{id}}/toggle"
+          hx-target="#todo-list"
+          hx-swap="innerHTML">{{check}}</button>
+  <span class="todo-label {{done_class}}">{{title}}</span>
+  <button class="btn btn-sm btn-danger"
+          hx-delete="/todos/{{id}}"
+          hx-target="#todo-list"
+          hx-swap="innerHTML">✕</button>
+</li>
+{{/todos}}
+{{#empty}}
+<li class="muted" style="padding:.5rem 0">No todos yet.</li>
+{{/empty}}

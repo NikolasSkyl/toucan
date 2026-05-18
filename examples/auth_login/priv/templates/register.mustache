@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register · Toucan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">🦜 toucan / auth_login</div>
+    <div class="card">
+      <h1>Create account</h1>
+      <p>Pick a username and password to get started.</p>
+
+      {{#error}}
+      <div class="flash flash-err">{{error}}</div>
+      {{/error}}
+
+      <form method="post" action="/register">
+        <div class="field">
+          <label>Username</label>
+          <input type="text" name="username" placeholder="alice" autofocus autocomplete="username">
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" name="password" placeholder="••••••••" autocomplete="new-password">
+        </div>
+        <button class="btn btn-full">Register</button>
+      </form>
+
+      <p class="muted">Already have an account? <a href="/login">Sign in</a></p>
+    </div>
+  </div>
+</body>
+</html>

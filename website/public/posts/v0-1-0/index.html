@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toucan v0.1.0 | Toucan</title>
+  <meta name="description" content="Toucan's first release brings pipeline routing, sessions, WebSockets, static files, security helpers, and runnable examples for Donna web apps.">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/style.css?v=20260518-responsive">
+  <script defer src="/assets/js/app.js?v=20260518"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <div class="site-header__inner">
+      <a href="/" class="site-logo">🐦‍⬛ toucan</a>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="/docs/">Docs</a>
+        <a href="/chronicles/">Chronicles</a>
+        <a href="https://github.com/NikolasSkyl/toucan" class="nav-gh" target="_blank" rel="noopener noreferrer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </nav>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="article-wrap">
+      <header class="article-header">
+        <a href="/chronicles/" class="article-header__back">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Chronicles
+        </a>
+        <h1>Toucan v0.1.0</h1>
+        <div class="article-header__meta">
+          <time class="article-header__date">2026-05-18</time>
+          <span class="article-header__read"></span>
+          <div class="tags"><span class="tag">release</span></div>
+        </div>
+      </header>
+
+      <article class="prose">
+        <p>Toucan v0.1.0 is the first public release of the framework. The goal is small
+and practical: make Donna comfortable for building HTTP APIs, server-rendered
+pages, and real-time browser apps without hiding the request pipeline behind
+macros or a registration DSL.</p>
+<h2>Why Toucan exists</h2>
+<p>Toucan routes are just functions. A <code>Ctx</code> flows through method filters, path
+matchers, middleware, and response terminals with Donna's <code>|&gt;</code> operator. A route
+that does not match returns <code>Rejected</code>; <code>toucan.try</code> restores the active request
+so the next route can attempt a match.</p>
+<p>That keeps the model explicit:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn router(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.try(home)
+  |&gt; toucan.try(api)
+  |&gt; toucan.not_found
+
+fn home(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.get
+  |&gt; toucan.path(&quot;/&quot;)
+  |&gt; toucan.html(&quot;&lt;h1&gt;Hello from Toucan&lt;/h1&gt;&quot;)
+</code></pre></div>
+<h2>What's Included</h2>
+<p><strong>Pipeline routing</strong> — Routes are function chains built with <code>|&gt;</code>. Method
+filters, path matchers, and response terminals are all plain functions.</p>
+<p><strong>URL parameters</strong> — Define <code>:name</code> segments in path patterns. Read captures with <code>toucan.param(c, &quot;name&quot;)</code>.</p>
+<p><strong>Request data</strong> — <code>form_field</code>, <code>query_param</code>, <code>header_of</code>, <code>content_type_of</code>, and <code>body_of</code> cover common request handling.</p>
+<p><strong>Responses</strong> — <code>html</code>, <code>json</code>, <code>ok</code>, <code>created</code>, <code>no_content</code>, <code>redirect</code>, and <code>respond</code> for full control over status and content type. Chain <code>set_header</code> to add arbitrary headers.</p>
+<p><strong>Static files</strong> — <code>static_dir</code> maps paths to a directory and returns <code>Rejected</code> on miss so subsequent handlers still run.</p>
+<p><strong>Security</strong> — <code>cors</code>, <code>csp</code>, and <code>secure_headers</code> add the standard defensive headers with a single call. Applied automatically on every response by <code>serve</code>.</p>
+<p><strong>Logging</strong> — <code>serve_logged</code> and <code>serve_with_logged</code> print coloured request lines. Pass <code>logger.Silent</code> for production.</p>
+<p><strong>WebSockets</strong> — <code>serve_ws</code> for echo and send-to-client use cases. <code>serve_chat</code> for broadcast — automatically sends each new client its connection ID, then broadcasts the handler's reply to all connected clients.</p>
+<p><strong>Shared state</strong> — <code>serve_with</code>, <code>serve_with_logged</code>, <code>serve_with_chat</code>, and <code>try_with</code> thread any state value through the handler pipeline without global variables.</p>
+<p><strong>Sessions</strong> — <code>toucan/session</code> provides a simple in-memory session store, cookie helpers, and the pieces needed for login flows and named chat users.</p>
+<h2>Examples</h2>
+<p>The release now ships with runnable examples under <code>examples/</code>. Every example
+uses port <code>8000</code> so you can start one, test it, stop it, and move to the next:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-sh">cd examples/basic
+donna run
+</code></pre></div>
+<p>Included examples:</p>
+<ul>
+<li><code>basic</code> — a minimal route and form handler</li>
+<li><code>todo_sqlite</code> — server-rendered todos backed by SQLite</li>
+<li><code>todo_json_api</code> — REST-style JSON todos</li>
+<li><code>auth_login</code> — registration, login, protected pages, and sessions</li>
+<li><code>file_upload</code> — text uploads and image previews with binary image writes</li>
+<li><code>url_shortener</code> — random slugs, SQLite storage, and redirects</li>
+<li><code>htmx_todos</code> — partial HTML updates with htmx</li>
+<li><code>chat_sessions</code> — WebSocket chat with session-backed display names</li>
+</ul>
+<p>These examples are intentionally small, but they exercise the framework surface:
+forms, static assets, template rendering, local state, sessions, SQLite, uploads,
+redirects, JSON responses, and WebSocket broadcasts.</p>
+<h2>Notes</h2>
+<p>Toucan is still a first release. The APIs are intentionally compact, and the
+examples favor clarity over production hardening. For example, <code>auth_login</code> uses
+a demo password hash, and <code>file_upload</code> keeps image uploads bounded so the
+current Donna string/runtime path stays stable.</p>
+<h2>Getting started</h2>
+<p>Add Toucan to your <code>donna.toml</code>:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-toml">toucan = { git = &quot;https://github.com/NikolasSkyl/toucan&quot;, version = &quot;&gt;=0.1.0 and &lt;1.0.0&quot; }
+</code></pre></div>
+<p>Then read the <a href="/docs/">Getting Started guide</a>.</p>
+
+      </article>
+
+      <footer class="article-footer">
+        <a href="/chronicles/" class="article-footer__back">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Back to Chronicles
+        </a>
+      </footer>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="site-footer__inner">
+        <div class="site-footer__brand">
+          <a href="/" class="site-logo">🐦‍⬛ toucan</a>
+          <p>A micro webframework for Donna.</p>
+        </div>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="/docs/">Documentation</a>
+          <a href="/chronicles/">Chronicles</a>
+          <a href="https://github.com/NikolasSkyl/toucan" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </nav>
+      </div>
+      <div class="site-footer__bottom">
+        <p>&copy; 2026 Nikolas Skyl. Built with <a href="https://nikolasskyl.github.io/leaf">leaf</a>.</p>
+        <p>Open source under the MIT license.</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

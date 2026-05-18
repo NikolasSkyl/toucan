@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat · Toucan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { padding: 0; justify-content: center; align-items: center; height: 100vh; background: var(--bg); }
+    .window { width: 360px; background: #fff; border-radius: 16px; box-shadow: var(--sh-lg, 0 8px 36px rgba(0,120,110,.14)); display: flex; flex-direction: column; overflow: hidden; }
+    .chat-header { padding: .9rem 1.1rem; background: var(--teal-d); color: #fff; font-family: var(--sans); font-weight: 700; font-size: .95rem; display: flex; align-items: center; gap: .5rem; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; opacity: .4; }
+    .dot.live { opacity: 1; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .who { margin-left: auto; font-size: .78rem; font-weight: 600; opacity: .9; }
+    .messages { flex: 1; height: 340px; overflow-y: auto; padding: .75rem; display: flex; flex-direction: column; gap: .4rem; }
+    .bubble { max-width: 80%; padding: .45rem .7rem; border-radius: 12px; font-size: .88rem; line-height: 1.4; word-break: break-word; }
+    .mine { align-self: flex-end; background: var(--teal-d); color: #fff; border-bottom-right-radius: 3px; }
+    .theirs { align-self: flex-start; background: var(--bg); color: var(--text); border-bottom-left-radius: 3px; }
+    .bubble-name { font-size: .7rem; font-weight: 600; margin-bottom: 2px; opacity: .7; }
+    .system { align-self: center; font-size: .72rem; color: var(--text-3); padding: .2rem .5rem; }
+    .bar { display: flex; gap: .5rem; padding: .6rem .75rem; border-top: 1px solid var(--border-l); }
+    .bar input { flex: 1; padding: .5rem .75rem; border: 1.5px solid var(--border); border-radius: 8px; font: inherit; font-size: .88rem; }
+    .bar input:focus { outline: none; border-color: var(--teal-d); }
+    .bar button { padding: .5rem 1rem; background: var(--teal-d); color: #fff; border: none; border-radius: 8px; font: inherit; font-weight: 600; font-size: .88rem; cursor: pointer; }
+    .bar button:hover { background: var(--teal-dd); }
+  </style>
+</head>
+<body data-user="{{username}}">
+  <div class="window">
+    <div class="chat-header">
+      <div class="dot" id="dot"></div>
+      Chat
+      <span class="who" id="who"></span>
+    </div>
+    <div class="messages" id="msgs"></div>
+    <div class="bar">
+      <input id="inp" placeholder="Message…" autocomplete="off">
+      <button id="btn">Send</button>
+    </div>
+  </div>
+  <script>
+    const me = document.body.dataset.user || 'Guest';
+    document.getElementById('who').textContent = me;
+    const ws = new WebSocket('ws://' + location.host + '/ws');
+    const msgs = document.getElementById('msgs');
+    const inp = document.getElementById('inp');
+    const dot = document.getElementById('dot');
+    let myId = null;
+
+    function bubble(text, cls, sender) {
+      const w = document.createElement('div');
+      if (cls === 'system') {
+        w.className = 'bubble system'; w.textContent = text;
+      } else {
+        w.className = 'bubble ' + cls;
+        if (cls === 'theirs') {
+          const n = document.createElement('div');
+          n.className = 'bubble-name'; n.textContent = sender; w.appendChild(n);
+        }
+        const t = document.createElement('div'); t.textContent = text; w.appendChild(t);
+      }
+      msgs.appendChild(w); msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    ws.onopen = () => dot.classList.add('live');
+    ws.onclose = () => { dot.classList.remove('live'); bubble('Disconnected', 'system', ''); };
+    ws.onmessage = e => {
+      const d = e.data;
+      if (d.startsWith('#')) { myId = d.slice(1); bubble('Connected as ' + me, 'system', ''); return; }
+      const i1 = d.indexOf('|'), i2 = d.indexOf('|', i1 + 1);
+      if (i1 < 0 || i2 < 0) return;
+      const sid = d.slice(0, i1), name = d.slice(i1 + 1, i2), text = d.slice(i2 + 1);
+      bubble(text, sid === myId ? 'mine' : 'theirs', name);
+    };
+
+    function send() {
+      const msg = inp.value.trim();
+      if (!msg || !myId) return;
+      ws.send(me + '|' + msg); inp.value = '';
+    }
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
+    document.getElementById('btn').addEventListener('click', send);
+  </script>
+</body>
+</html>

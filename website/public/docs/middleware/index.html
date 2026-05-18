@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Middleware | Toucan</title>
+  <meta name="description" content="CORS, CSP, security headers, logging, static files, and writing your own middleware.">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/style.css?v=20260518-responsive">
+  <script defer src="/assets/js/app.js?v=20260518"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <div class="site-header__inner">
+      <a href="/" class="site-logo">🐦‍⬛ toucan</a>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="/docs/">Docs</a>
+        <a href="/chronicles/">Chronicles</a>
+        <a href="https://github.com/NikolasSkyl/toucan" class="nav-gh" target="_blank" rel="noopener noreferrer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </nav>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="docs-layout">
+      <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
+
+      <aside class="docs-sidebar" id="docs-sidebar" aria-label="Documentation">
+        <span class="toc-label">Documentation</span>
+        <nav aria-label="Documentation pages">
+          <div class="sidebar-section"><div class="sidebar-heading">Getting Started</div><ul class="sidebar-nav"><li><a href="/docs/">Introduction</a></li></ul></div><div class="sidebar-section"><div class="sidebar-heading">Core</div><ul class="sidebar-nav"><li><a href="/docs/routing/">Routing</a></li><li><a href="/docs/handlers/">Handlers</a></li><li><a href="/docs/requests/">Requests</a></li><li><a href="/docs/responses/">Responses</a></li><li><a href="/docs/websockets/">WebSockets</a></li><li><a href="/docs/middleware/" class="active">Middleware</a></li></ul></div>
+        </nav>
+      </aside>
+
+      <div class="docs-main">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Open table of contents" aria-expanded="false">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+          Documentation
+        </button>
+
+        <article class="prose" id="doc-article">
+          <h1>Middleware</h1>
+          <p>CORS, CSP, security headers, logging, static files, and writing your own middleware.</p>
+          <h2>Security headers</h2>
+<p><code>toucan.secure_headers</code> adds <code>X-Content-Type-Options</code>, <code>X-Frame-Options</code>, and <code>Referrer-Policy</code> to every matched response. Toucan applies these automatically on every response dispatched by <code>serve</code> — you only need to call this directly in unusual pipelines.</p>
+<h2>CORS</h2>
+<p>Handle cross-origin requests with <code>toucan.cors</code> and <code>toucan.preflight</code>:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn router(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.preflight
+  |&gt; toucan.try(api_data)
+  |&gt; toucan.not_found
+  |&gt; toucan.cors(&quot;https://myapp.com&quot;)
+</code></pre></div>
+<ul>
+<li><code>preflight</code> intercepts <code>OPTIONS</code> requests and responds 204</li>
+<li><code>cors(c, origin)</code> adds <code>Access-Control-Allow-Origin</code>, <code>Allow-Methods</code>, and <code>Allow-Headers</code> to any matched response</li>
+</ul>
+<p>Pass <code>&quot;*&quot;</code> to allow all origins:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">  |&gt; toucan.cors(&quot;*&quot;)
+</code></pre></div>
+<h2>Content Security Policy</h2>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn router(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.try(home)
+  |&gt; toucan.not_found
+  |&gt; toucan.csp(&quot;default-src 'self'; img-src 'self' data:&quot;)
+</code></pre></div>
+<p><code>toucan.csp(c, policy)</code> adds <code>Content-Security-Policy: &lt;policy&gt;</code> to every matched response.</p>
+<h2>Request logging</h2>
+<p>Use <code>serve_logged</code> instead of <code>serve</code> to print coloured request lines:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">pub fn main() -&gt; Nil:
+  toucan.serve_logged(router, 8080, logger.Verbose)
+</code></pre></div>
+<p>Or with shared state:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">pub fn main() -&gt; Nil:
+  toucan.serve_with_logged(db, router, 8080, logger.Verbose)
+</code></pre></div>
+<p>Pass <code>logger.Silent</code> to suppress output entirely.</p>
+<h2>Static files</h2>
+<p><code>toucan.static_dir(c, dir)</code> maps the request path to a file inside <code>dir</code>. Returns <code>Rejected</code> when the file is not found so the next handler can run.</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn router(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.try(serve_assets)
+  |&gt; toucan.try(home)
+  |&gt; toucan.not_found
+
+fn serve_assets(c: toucan.Ctx) -&gt; toucan.Ctx:
+  toucan.static_dir(c, &quot;priv/static&quot;)
+</code></pre></div>
+<p>A request to <code>/style.css</code> looks for <code>priv/static/style.css</code>. Paths ending in <code>/</code> resolve to <code>index.html</code>.</p>
+<h2>Custom middleware</h2>
+<p>Any <code>fn(Ctx) -&gt; Ctx</code> is middleware. The three Ctx variants let you decide when to act:</p>
+<ul>
+<li><code>Active</code> — the request is still being matched, no response yet</li>
+<li><code>Rejected</code> — a filter didn't match; usually pass it through unchanged</li>
+<li><code>Matched</code> — a response has been set; this is when you add headers or log</li>
+</ul>
+<h3>Adding a header to every response</h3>
+<p>The most common pattern: do nothing until a response is matched, then decorate it:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn cache_control(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.set_header(&quot;Cache-Control&quot;, &quot;no-store&quot;)
+</code></pre></div>
+<p>Apply it after the rest of the pipeline so it always runs on the final response:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn router(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.try(home)
+  |&gt; toucan.try(api_data)
+  |&gt; toucan.not_found
+  |&gt; cache_control
+</code></pre></div>
+<h3>Auth middleware</h3>
+<p>Inspect the request while <code>Active</code>, reject early if the check fails:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn require_auth(c: toucan.Ctx) -&gt; toucan.Ctx:
+  case c:
+    toucan.Active(_, _) -&gt;
+      case toucan.header_of(c, &quot;Authorization&quot;):
+        &quot;&quot; -&gt; toucan.respond(c, 401, &quot;text/plain&quot;, &quot;Unauthorized&quot;)
+        _  -&gt; c
+    other -&gt; other
+</code></pre></div>
+<p>Wrap only the routes that need protection with <code>toucan.try</code>:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn router(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.try(public_home)
+  |&gt; toucan.try(protected_route)
+  |&gt; toucan.not_found
+
+fn protected_route(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.get
+  |&gt; toucan.path(&quot;/admin&quot;)
+  |&gt; require_auth
+  |&gt; toucan.html(admin_html())
+</code></pre></div>
+<h3>Shared state middleware</h3>
+<p>When using <code>serve_with</code>, thread state through custom middleware using <code>try_with</code>:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn require_user(c: toucan.Ctx, db: Db) -&gt; toucan.Ctx:
+  case c:
+    toucan.Active(_, _) -&gt;
+      let token = toucan.header_of(c, &quot;Authorization&quot;)
+      case db_lookup_token(db, token):
+        False -&gt; toucan.respond(c, 403, &quot;text/plain&quot;, &quot;Forbidden&quot;)
+        True  -&gt; c
+    other -&gt; other
+
+fn protected(c: toucan.Ctx, db: Db) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.try_with(db, require_user)
+  |&gt; toucan.get
+  |&gt; toucan.path(&quot;/dashboard&quot;)
+  |&gt; toucan.html(dashboard_html())
+</code></pre></div>
+
+          <div class="page-nav"><a class="page-nav-btn" href="/docs/websockets/"><span>← Previous</span><strong>WebSockets</strong></a><span></span></div>
+        </article>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="site-footer__inner">
+        <div class="site-footer__brand">
+          <a href="/" class="site-logo">🐦‍⬛ toucan</a>
+          <p>A micro webframework for Donna.</p>
+        </div>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="/docs/">Documentation</a>
+          <a href="/chronicles/">Chronicles</a>
+          <a href="https://github.com/NikolasSkyl/toucan" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </nav>
+      </div>
+      <div class="site-footer__bottom">
+        <p>&copy; 2026 Nikolas Skyl. Built with <a href="https://nikolasskyl.github.io/leaf">leaf</a>.</p>
+        <p>Open source under the MIT license.</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

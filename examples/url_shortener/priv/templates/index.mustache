@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URL Shortener · Toucan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">🦜 toucan / url_shortener</div>
+
+    <div class="card">
+      <h1>Shorten a URL</h1>
+      <p>Paste a long URL and get a short link.</p>
+
+      {{#created}}
+      <div class="flash flash-ok">
+        Short link: <a href="/{{slug}}" class="code">/{{slug}}</a>
+        → <span class="muted">{{url}}</span>
+      </div>
+      {{/created}}
+
+      {{#error}}
+      <div class="flash flash-err">{{error}}</div>
+      {{/error}}
+
+      <form method="post" action="/shorten">
+        <div class="field">
+          <label>Long URL</label>
+          <input type="url" name="url" placeholder="https://example.com/very/long/path" autofocus>
+        </div>
+        <button class="btn btn-full">Shorten →</button>
+      </form>
+    </div>
+
+    {{#has_links}}
+    <div class="card">
+      <h2>Recent links</h2>
+      <ul class="todo-list">
+        {{#links}}
+        <li class="todo-item">
+          <a href="/{{slug}}" class="code">/{{slug}}</a>
+          <span class="todo-label muted">→ {{url}}</span>
+          <form class="inline-form" method="post" action="/delete/{{slug}}">
+            <button class="btn btn-sm btn-danger">✕</button>
+          </form>
+        </li>
+        {{/links}}
+      </ul>
+    </div>
+    {{/has_links}}
+  </div>
+</body>
+</html>

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Routing | Toucan</title>
+  <meta name="description" content="Match requests by method and path. Capture URL parameters.">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/css/style.css?v=20260518-responsive">
+  <script defer src="/assets/js/app.js?v=20260518"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <div class="site-header__inner">
+      <a href="/" class="site-logo">🐦‍⬛ toucan</a>
+      <nav class="site-nav" id="site-nav" aria-label="Main">
+        <a href="/docs/">Docs</a>
+        <a href="/chronicles/">Chronicles</a>
+        <a href="https://github.com/NikolasSkyl/toucan" class="nav-gh" target="_blank" rel="noopener noreferrer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </nav>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="docs-layout">
+      <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
+
+      <aside class="docs-sidebar" id="docs-sidebar" aria-label="Documentation">
+        <span class="toc-label">Documentation</span>
+        <nav aria-label="Documentation pages">
+          <div class="sidebar-section"><div class="sidebar-heading">Getting Started</div><ul class="sidebar-nav"><li><a href="/docs/">Introduction</a></li></ul></div><div class="sidebar-section"><div class="sidebar-heading">Core</div><ul class="sidebar-nav"><li><a href="/docs/routing/" class="active">Routing</a></li><li><a href="/docs/handlers/">Handlers</a></li><li><a href="/docs/requests/">Requests</a></li><li><a href="/docs/responses/">Responses</a></li><li><a href="/docs/websockets/">WebSockets</a></li><li><a href="/docs/middleware/">Middleware</a></li></ul></div>
+        </nav>
+      </aside>
+
+      <div class="docs-main">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Open table of contents" aria-expanded="false">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+          Documentation
+        </button>
+
+        <article class="prose" id="doc-article">
+          <h1>Routing</h1>
+          <p>Match requests by method and path. Capture URL parameters.</p>
+          <h2>Method filters</h2>
+<p>Use <code>toucan.get</code>, <code>toucan.post</code>, <code>toucan.put</code>, <code>toucan.delete</code>, or <code>toucan.patch</code> to match an HTTP method. If the request method doesn't match, the context becomes <code>Rejected</code> and <code>try</code> moves on.</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn update_user(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.put
+  |&gt; toucan.path(&quot;/users/:id&quot;)
+  |&gt; handle_update
+</code></pre></div>
+<h2>Path matching</h2>
+<p><code>toucan.path(c, pattern)</code> matches the request path against a pattern:</p>
+<ul>
+<li><strong>Literal segments</strong> — <code>/about</code>, <code>/api/v1/status</code></li>
+<li><strong>Parameter segments</strong> — <code>:name</code> captures one path segment</li>
+<li><strong>Exact match</strong> — the pattern must match the entire path, not just a prefix</li>
+</ul>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn show_post(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.get
+  |&gt; toucan.path(&quot;/posts/:slug&quot;)
+  |&gt; render_post
+</code></pre></div>
+<h2>URL parameters</h2>
+<p>Read captured segments with <code>toucan.param(c, &quot;name&quot;)</code>. Returns <code>&quot;&quot;</code> if the key was not captured.</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn render_post(c: toucan.Ctx) -&gt; toucan.Ctx:
+  let slug = toucan.param(c, &quot;slug&quot;)
+  toucan.html(c, &quot;&lt;h1&gt;&quot; &lt;&gt; slug &lt;&gt; &quot;&lt;/h1&gt;&quot;)
+</code></pre></div>
+<h2>Path prefixes</h2>
+<p>Use <code>toucan.path_prefix(c, prefix)</code> to match any path that starts with a prefix — useful for grouping routes under a sub-path:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn api_routes(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.path_prefix(&quot;/api&quot;)
+  |&gt; toucan.try(api_users)
+  |&gt; toucan.try(api_posts)
+</code></pre></div>
+<h2>Composing routes</h2>
+<p>Wrap each route in a function and pipe them through <code>toucan.try</code>. The first handler to return a <code>Matched</code> context wins; all subsequent handlers are skipped.</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn router(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.try(home)
+  |&gt; toucan.try(about)
+  |&gt; toucan.try(show_user)
+  |&gt; toucan.try(create_user)
+  |&gt; toucan.not_found
+</code></pre></div>
+<h2>Shared state</h2>
+<p>When handlers need access to a database or configuration, use <code>toucan.try_with</code> and <code>toucan.serve_with</code>:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn router(c: toucan.Ctx, db: sqlite.Db) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.try_with(db, list_users)
+  |&gt; toucan.try_with(db, create_user)
+  |&gt; toucan.not_found
+
+pub fn main() -&gt; Nil:
+  let db = sqlite.open(&quot;app.db&quot;)
+  toucan.serve_with(db, router, 8080)
+</code></pre></div>
+<p>Each handler receives both the context and the shared state:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn list_users(c: toucan.Ctx, db: sqlite.Db) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.get
+  |&gt; toucan.path(&quot;/users&quot;)
+  |&gt; render_users(db)
+</code></pre></div>
+<h2>Preflight (OPTIONS)</h2>
+<p>For CORS preflight requests, place <code>toucan.preflight</code> at the top of the pipeline:</p>
+<div class="code-block"><div class="code-block-bar"><div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div><span class="code-block-label">code</span></div><pre><code class="language-donna">fn router(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.preflight
+  |&gt; toucan.try(home)
+  |&gt; toucan.not_found
+  |&gt; toucan.cors(&quot;*&quot;)
+</code></pre></div>
+<p><code>preflight</code> intercepts <code>OPTIONS</code> requests and responds 204. The <code>cors</code> call at the end adds the CORS headers to every matched response.</p>
+
+          <div class="page-nav"><a class="page-nav-btn" href="/docs/"><span>← Previous</span><strong>Getting Started</strong></a><a class="page-nav-btn next" href="/docs/handlers/"><span>Next →</span><strong>Handlers</strong></a></div>
+        </article>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="site-footer__inner">
+        <div class="site-footer__brand">
+          <a href="/" class="site-logo">🐦‍⬛ toucan</a>
+          <p>A micro webframework for Donna.</p>
+        </div>
+        <nav class="site-footer__links" aria-label="Footer">
+          <a href="/docs/">Documentation</a>
+          <a href="/chronicles/">Chronicles</a>
+          <a href="https://github.com/NikolasSkyl/toucan" target="_blank" rel="noopener noreferrer">GitHub</a>
+        </nav>
+      </div>
+      <div class="site-footer__bottom">
+        <p>&copy; 2026 Nikolas Skyl. Built with <a href="https://nikolasskyl.github.io/leaf">leaf</a>.</p>
+        <p>Open source under the MIT license.</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

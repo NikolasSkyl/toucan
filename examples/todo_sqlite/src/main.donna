@@ -1,0 +1,179 @@
+import toucan
+import mustache
+import sqlite
+import mongoose
+import donna/string
+
+fn read_template(name: String) -> String:
+  case mongoose.read_file("priv/templates/" <> name <> ".mustache"):
+    mongoose.Err(_) -> "<!-- template missing: " <> name <> " -->"
+    mongoose.Ok(t)  -> t
+
+fn db_init(path: String) -> Nil:
+  case sqlite.open(path):
+    sqlite.Err(_) -> Nil
+    sqlite.Ok(db) ->
+      let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0)")
+      sqlite.close(db)
+
+fn db_all(path: String) -> List(List(sqlite.Value)):
+  case sqlite.open(path):
+    sqlite.Err(_) -> []
+    sqlite.Ok(db) ->
+      case sqlite.query(db, "SELECT id, title, done FROM todos ORDER BY id ASC"):
+        sqlite.Err(_) ->
+          sqlite.close(db)
+          []
+        sqlite.Ok(rows) ->
+          sqlite.close(db)
+          rows
+
+fn db_create(path: String, title: String) -> Nil:
+  case string.is_empty(string.trim(title)):
+    True -> Nil
+    False ->
+      case sqlite.open(path):
+        sqlite.Err(_) -> Nil
+        sqlite.Ok(db) ->
+          case sqlite.prepare(db, "INSERT INTO todos (title) VALUES (?)"):
+            sqlite.Err(_) -> sqlite.close(db)
+            sqlite.Ok(stmt) ->
+              let _ = sqlite.bind_text(stmt, 1, string.trim(title))
+              let _ = sqlite.step(stmt)
+              sqlite.finalize(stmt)
+              sqlite.close(db)
+
+fn db_toggle(path: String, id: Int) -> Nil:
+  case sqlite.open(path):
+    sqlite.Err(_) -> Nil
+    sqlite.Ok(db) ->
+      case sqlite.prepare(db, "UPDATE todos SET done = 1 - done WHERE id = ?"):
+        sqlite.Err(_) -> sqlite.close(db)
+        sqlite.Ok(stmt) ->
+          let _ = sqlite.bind_int(stmt, 1, id)
+          let _ = sqlite.step(stmt)
+          sqlite.finalize(stmt)
+          sqlite.close(db)
+
+fn db_delete(path: String, id: Int) -> Nil:
+  case sqlite.open(path):
+    sqlite.Err(_) -> Nil
+    sqlite.Ok(db) ->
+      case sqlite.prepare(db, "DELETE FROM todos WHERE id = ?"):
+        sqlite.Err(_) -> sqlite.close(db)
+        sqlite.Ok(stmt) ->
+          let _ = sqlite.bind_int(stmt, 1, id)
+          let _ = sqlite.step(stmt)
+          sqlite.finalize(stmt)
+          sqlite.close(db)
+
+fn rows_to_view(rows: List(List(sqlite.Value))) -> List(List(mustache.Value)):
+  case rows:
+    [] -> []
+    [row, ..rest] -> [row_to_view(row), ..rows_to_view(rest)]
+
+fn row_to_view(row: List(sqlite.Value)) -> List(mustache.Value):
+  let id      = cell_str(row_nth(row, 0))
+  let title   = cell_str(row_nth(row, 1))
+  let is_done = cell_str(row_nth(row, 2)) == "1"
+  [
+    mustache.text("id",         id),
+    mustache.text("title",      title),
+    mustache.text("done_class", case is_done: True -> "done" False -> ""),
+    mustache.text("check",      case is_done: True -> "✓"    False -> "○")
+  ]
+
+fn cell_str(v: sqlite.Value) -> String:
+  case v:
+    sqlite.Text(s)  -> s
+    sqlite.Int(n)   -> string.from_int(n)
+    sqlite.Float(_) -> ""
+    sqlite.Blob(s)  -> s
+    sqlite.Null     -> ""
+
+fn row_nth(row: List(sqlite.Value), n: Int) -> sqlite.Value:
+  case n:
+    0 ->
+      case row:
+        []       -> sqlite.Null
+        [v, ..]  -> v
+    _ ->
+      case row:
+        []         -> sqlite.Null
+        [_, ..rest] -> row_nth(rest, n - 1)
+
+fn render_index(db: String) -> String:
+  let rows  = db_all(db)
+  let count = string.from_int(list_length(rows))
+  let tmpl  = read_template("index")
+  mustache.render_view(tmpl, [
+    mustache.text("count", count),
+    mustache.bool("empty", rows == []),
+    mustache.list("todos", rows_to_view(rows))
+  ])
+
+fn list_length(xs: List(a)) -> Int:
+  case xs:
+    []       -> 0
+    [_, ..rest] -> 1 + list_length(rest)
+
+fn handler(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.try(static_files)
+  |> toucan.try_with(db, index)
+  |> toucan.try_with(db, create_todo)
+  |> toucan.try_with(db, toggle_todo)
+  |> toucan.try_with(db, delete_todo)
+  |> toucan.not_found
+
+fn static_files(c: toucan.Ctx) -> toucan.Ctx:
+  toucan.static_dir(c, "priv")
+
+fn index(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/")
+  |> toucan.html(render_index(db))
+
+fn create_todo(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.post
+  |> toucan.path("/todos")
+  |> do_create(db)
+
+fn do_create(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let _ = db_create(db, toucan.form_field(c, "title"))
+      toucan.redirect(c, "/")
+    other -> other
+
+fn toggle_todo(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.post
+  |> toucan.path("/todos/:id/toggle")
+  |> do_toggle(db)
+
+fn do_toggle(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let _ = db_toggle(db, string.to_int(toucan.param(c, "id")))
+      toucan.redirect(c, "/")
+    other -> other
+
+fn delete_todo(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.post
+  |> toucan.path("/todos/:id/delete")
+  |> do_delete(db)
+
+fn do_delete(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let _ = db_delete(db, string.to_int(toucan.param(c, "id")))
+      toucan.redirect(c, "/")
+    other -> other
+
+pub fn main() -> Nil:
+  db_init("todos.db")
+  toucan.serve_with("todos.db", handler, 8000)

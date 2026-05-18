@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{filename}} · Toucan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    pre { background: var(--teal-xxl); border: 1px solid var(--border-l); border-radius: 8px;
+          padding: 1rem; overflow-x: auto; font-size: .85rem; line-height: 1.6;
+          white-space: pre-wrap; word-break: break-word; color: var(--text-2); }
+  </style>
+</head>
+<body>
+  <div class="wrap wide">
+    <div class="brand">🦜 toucan / file_upload</div>
+    <div class="card">
+      <h1>{{filename}}</h1>
+      <p><a href="/" class="btn btn-ghost btn-sm">← Back</a></p>
+      {{#is_image}}
+      <img class="image-preview" src="{{image_src}}" alt="{{filename}}">
+      {{/is_image}}
+      {{^is_image}}
+      <pre>{{content}}</pre>
+      {{/is_image}}
+    </div>
+  </div>
+</body>
+</html>

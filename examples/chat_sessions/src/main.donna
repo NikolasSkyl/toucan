@@ -1,0 +1,114 @@
+import toucan
+import toucan/session
+import mustache
+import mongoose
+import donna/string
+
+fn read_template(name: String) -> String:
+  case mongoose.read_file("priv/templates/" <> name <> ".mustache"):
+    mongoose.Err(_) -> "<!-- template missing: " <> name <> " -->"
+    mongoose.Ok(t)  -> t
+
+fn on_message(conn_id: String, msg: String) -> String:
+  let sep = string.index_of(msg, "|")
+  case sep < 0:
+    True -> ""
+    False ->
+      let name = string.slice(msg, 0, sep)
+      let text = string.slice(msg, sep + 1, string.length(msg) - sep - 1)
+      case string.is_empty(string.trim(text)):
+        True  -> ""
+        False -> conn_id <> "|" <> name <> "|" <> text
+
+fn handler(c: toucan.Ctx, store: session.Store) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let sid = session.start(c, store)
+      c
+      |> toucan.try(static_files)
+      |> toucan.try_with(#(store, sid), root)
+      |> toucan.try_with(#(store, sid), join_page)
+      |> toucan.try_with(#(store, sid), join_post)
+      |> toucan.try_with(#(store, sid), chat_page)
+      |> toucan.try_with(#(store, sid), leave)
+      |> toucan.not_found
+    other -> other
+
+fn static_files(c: toucan.Ctx) -> toucan.Ctx:
+  toucan.static_dir(c, "priv")
+
+fn root(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  let #(store, sid) = state
+  c
+  |> toucan.get
+  |> toucan.path("/")
+  |> do_root(store, sid)
+
+fn do_root(c: toucan.Ctx, store: session.Store, sid: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let name = session.get(store, sid, "name")
+      case string.is_empty(name):
+        True  -> toucan.redirect(c, "/join")
+        False -> toucan.redirect(c, "/chat")
+    other -> other
+
+fn join_page(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/join")
+  |> toucan.html(mustache.render(read_template("login"), [#("error", "")]))
+
+fn join_post(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  let #(store, sid) = state
+  c
+  |> toucan.post
+  |> toucan.path("/join")
+  |> do_join(store, sid)
+
+fn do_join(c: toucan.Ctx, store: session.Store, sid: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let name = string.trim(toucan.form_field(c, "name"))
+      case string.is_empty(name):
+        True ->
+          toucan.html(c, mustache.render(read_template("login"), [#("error", "Please enter a name")]))
+        False ->
+          let _ = session.put(store, sid, "name", name)
+          toucan.redirect(c, "/chat")
+          |> session.set_cookie(sid)
+    other -> other
+
+fn chat_page(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  let #(store, sid) = state
+  let name = session.get(store, sid, "name")
+  c
+  |> toucan.get
+  |> toucan.path("/chat")
+  |> show_chat(name)
+
+fn show_chat(c: toucan.Ctx, name: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      case string.is_empty(name):
+        True  -> toucan.redirect(c, "/join")
+        False -> toucan.html(c, mustache.render(read_template("chat"), [#("username", name)]))
+    other -> other
+
+fn leave(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  let #(store, sid) = state
+  c
+  |> toucan.get
+  |> toucan.path("/leave")
+  |> do_leave(store, sid)
+
+fn do_leave(c: toucan.Ctx, store: session.Store, sid: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let _ = session.destroy(store, sid)
+      toucan.redirect(c, "/join")
+      |> toucan.set_header("Set-Cookie", "sid=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0")
+    other -> other
+
+pub fn main() -> Nil:
+  toucan.serve_with_chat(session.new_store(), handler, on_message, 8000)

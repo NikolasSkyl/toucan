@@ -1,0 +1,43 @@
+import toucan
+import donna/string
+
+fn handler(c: toucan.Ctx) -> toucan.Ctx:
+  c
+  |> toucan.try(static_files)
+  |> toucan.try(home)
+  |> toucan.try(greet)
+  |> toucan.not_found
+
+fn static_files(c: toucan.Ctx) -> toucan.Ctx:
+  toucan.static_dir(c, "priv")
+
+fn home(c: toucan.Ctx) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/")
+  |> toucan.html(home_html())
+
+fn greet(c: toucan.Ctx) -> toucan.Ctx:
+  c
+  |> toucan.post
+  |> toucan.path("/greet")
+  |> do_greet
+
+fn do_greet(c: toucan.Ctx) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let raw  = toucan.form_field(c, "name")
+      let name = case string.is_empty(string.trim(raw)):
+        True  -> "World"
+        False -> string.trim(raw)
+      toucan.html(c, result_html(name))
+    other -> other
+
+fn home_html() -> String:
+  "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Basic · Toucan</title><link rel='stylesheet' href='/static/style.css'></head><body><div class='wrap'><div class='brand'>🦜 toucan / basic</div><div class='card'><h1>Hello!</h1><p>A minimal Toucan app. Enter your name below.</p><form method='post' action='/greet'><div class='field'><label>Your name</label><input type='text' name='name' placeholder='e.g. Alice' autofocus></div><button class='btn btn-full'>Say hello →</button></form></div></div></body></html>"
+
+fn result_html(name: String) -> String:
+  "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Hello · Toucan</title><link rel='stylesheet' href='/static/style.css'></head><body><div class='wrap'><div class='brand'>🦜 toucan / basic</div><div class='card'><h1>Hello, " <> name <> "!</h1><p>Your Toucan app is working.</p><a href='/' class='btn btn-ghost'>← Try again</a></div></div></body></html>"
+
+pub fn main() -> Nil:
+  toucan.serve(handler, 8000)

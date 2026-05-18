@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Toucan | Toucan</title>
+      <meta name="description" content="">
+      <link rel="icon" href="/favicon.ico">
+      <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+      <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+      <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+      <link rel="manifest" href="/site.webmanifest">
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+      <link rel="stylesheet" href="/assets/css/style.css?v=20260518-responsive">
+      <script defer src="/assets/js/app.js?v=20260518"></script>
+    </head>
+    <body>
+        <header class="site-header">
+          <div class="container">
+            <div class="site-header__inner">
+            <a href="/" class="site-logo">🐦‍⬛ toucan</a>
+            <nav class="site-nav" id="site-nav" aria-label="Main">
+              <a href="/docs/">Docs</a>
+              <a href="/chronicles/">Chronicles</a>
+              <a href="https://github.com/NikolasSkyl/toucan" class="nav-gh" target="_blank" rel="noopener noreferrer">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                GitHub
+              </a>
+            </nav>
+            <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+            </div>
+          </div>
+        </header>
+
+        <main>
+            <section class="hero">
+                <div class="container">
+                    <img
+                        src="/toucan.png"
+                        alt="Toucan logo"
+                        class="hero__logo"
+                    />
+
+                    <div class="hero__badge">
+                        <span class="hero__badge-dot"></span>
+                        Open source &amp; MIT licensed
+                    </div>
+
+                    <h1>The micro webframework<br /><em>for Donna.</em></h1>
+
+                    <p>
+                        Toucan is a micro webframework for Donna. Chain handlers
+                        with <code>|&gt;</code>, match routes, send responses.
+                        No magic — just functions.
+                    </p>
+
+                    <div class="hero__actions">
+                        <a href="/docs/" class="btn btn--primary btn--lg">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                aria-hidden="true"
+                            >
+                                <path d="M5 12h14M12 5l7 7-7 7" />
+                            </svg>
+                            Get Started
+                        </a>
+                        <a
+                            href="https://github.com/NikolasSkyl/toucan"
+                            class="btn btn--ghost btn--lg"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="currentColor"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                                />
+                            </svg>
+                            View on GitHub
+                        </a>
+                    </div>
+
+                    <div class="hero__terminal" aria-label="Terminal example">
+                        <pre><code><span class="t-dim"># add toucan to donna.toml</span>
+<span class="t-prompt">$</span> donna new my-app &amp;&amp; cd my-app
+
+<span class="t-dim"># write a handler and serve</span>
+<span class="t-prompt">$</span> donna run
+<span class="t-out">Toucan listening on:  http://localhost:8080</span></code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <section class="features">
+                <div class="container">
+                    <div class="section-header">
+                        <h2>
+                            Everything a handler needs.<br />Nothing it doesn't.
+                        </h2>
+                        <p>Toucan stays small so your code stays clear.</p>
+                    </div>
+
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="feature-card__icon">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                >
+                                    <polyline points="6 3 20 12 6 21 6 3" />
+                                </svg>
+                            </div>
+                            <h3>Pipeline routing</h3>
+                            <p>
+                                Compose routes with <code>|&gt;</code>. Method
+                                filters, path matchers, and responses are all
+                                plain functions.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-card__icon">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                >
+                                    <circle cx="12" cy="12" r="10" />
+                                    <line x1="12" y1="8" x2="12" y2="12" />
+                                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                                </svg>
+                            </div>
+                            <h3>Zero magic</h3>
+                            <p>
+                                Handlers are <code>fn(Ctx) -&gt; Ctx</code>. No
+                                decorators, no macros, no hidden wiring
+                                anywhere.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-card__icon">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                >
+                                    <path
+                                        d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013 5.18 2 2 0 015 3h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L9.09 10.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 17z"
+                                    />
+                                </svg>
+                            </div>
+                            <h3>WebSocket ready</h3>
+                            <p>
+                                Use <code>serve_ws</code> for echo servers or
+                                <code>serve_chat</code> to broadcast to every
+                                connected client.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-card__icon">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                >
+                                    <path
+                                        d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"
+                                    />
+                                    <circle cx="12" cy="10" r="3" />
+                                </svg>
+                            </div>
+                            <h3>URL parameters</h3>
+                            <p>
+                                Define <code>:name</code> segments in your path
+                                pattern. Read captures with
+                                <code>toucan.param(c, "name")</code>.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-card__icon">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                >
+                                    <rect
+                                        x="3"
+                                        y="11"
+                                        width="18"
+                                        height="11"
+                                        rx="2"
+                                        ry="2"
+                                    />
+                                    <path d="M7 11V7a5 5 0 0110 0v4" />
+                                </svg>
+                            </div>
+                            <h3>Security defaults</h3>
+                            <p>
+                                CORS, CSP, <code>X-Frame-Options</code>, and
+                                <code>Referrer-Policy</code> added with a single
+                                function call.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-card__icon">
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                >
+                                    <polygon
+                                        points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"
+                                    />
+                                </svg>
+                            </div>
+                            <h3>Native speed</h3>
+                            <p>
+                                Compiles to a native binary with Donna. Zero
+                                runtime overhead, zero garbage collector pauses.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="quickstart">
+                <div class="container">
+                    <div class="quickstart__inner">
+                        <div class="quickstart__text">
+                            <h2>A route is just a function chain.</h2>
+                            <p>
+                                Filter by method, match a path, capture
+                                parameters, send a response. Every step is
+                                composable and testable on its own.
+                            </p>
+                            <a href="/docs/" class="btn btn--primary"
+                                >Read the docs &rarr;</a
+                            >
+                        </div>
+                        <div>
+                            <pre><code>import toucan
+
+fn handler(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.try(home)
+  |&gt; toucan.try(show_user)
+  |&gt; toucan.landing_page
+  |&gt; toucan.not_found
+
+fn home(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.get
+  |&gt; toucan.path("/hello")
+  |&gt; toucan.html("&lt;h1&gt;Hello!&lt;/h1&gt;")
+
+fn show_user(c: toucan.Ctx) -&gt; toucan.Ctx:
+  c
+  |&gt; toucan.get
+  |&gt; toucan.path("/users/:id")
+  |&gt; render_user
+
+pub fn main() -&gt; Nil:
+  toucan.serve(handler, 8080)</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="site-footer">
+          <div class="container">
+            <div class="site-footer__inner">
+              <div class="site-footer__brand">
+                <a href="/" class="site-logo">🐦‍⬛ toucan</a>
+                <p>A micro webframework for Donna.</p>
+              </div>
+              <nav class="site-footer__links" aria-label="Footer">
+                <a href="/docs/">Documentation</a>
+                <a href="/chronicles/">Chronicles</a>
+                <a href="https://github.com/NikolasSkyl/toucan" target="_blank" rel="noopener noreferrer">GitHub</a>
+              </nav>
+            </div>
+            <div class="site-footer__bottom">
+              <p>&copy; 2026 Nikolas Skyl. Built with <a href="https://nikolasskyl.github.io/leaf">leaf</a>.</p>
+              <p>Open source under the MIT license.</p>
+            </div>
+          </div>
+        </footer>
+    </body>
+</html>

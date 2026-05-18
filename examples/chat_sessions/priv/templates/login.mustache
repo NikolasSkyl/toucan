@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join Chat · Toucan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">🦜 toucan / chat_sessions</div>
+    <div class="card">
+      <h1>Join the chat</h1>
+      <p>Pick a display name to get started.</p>
+
+      {{#error}}
+      <div class="flash flash-err">{{error}}</div>
+      {{/error}}
+
+      <form method="post" action="/join">
+        <div class="field">
+          <label>Your name</label>
+          <input type="text" name="name" placeholder="e.g. Alice" autofocus autocomplete="off">
+        </div>
+        <button class="btn btn-full">Enter chat →</button>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,9 @@
+import toucan/query
+
+/// Parse a `application/x-www-form-urlencoded` body string into key-value pairs.
+pub fn parse(bdy: String) -> List(#(String, String)):
+  query.parse(bdy)
+
+/// Look up a field from parsed form data, returning `""` if absent.
+pub fn get(fields: List(#(String, String)), key: String) -> String:
+  query.get(fields, key)

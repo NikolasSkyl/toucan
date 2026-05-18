@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+{{> head}}
+<body>
+  {{> header}}
+
+  <main>
+    <div class="container">
+      <header class="chronicles-header">
+        <h1>{{title}}</h1>
+        <p>{{lead}}</p>
+      </header>
+
+      <section class="post-list" aria-label="Articles">
+        <div class="post-grid">
+          {{{news_articles}}}
+        </div>
+      </section>
+    </div>
+  </main>
+
+  {{> footer}}
+</body>
+</html>

@@ -1,0 +1,47 @@
+title = "Toucan"
+base_url = "https://nikolasskyl.github.io/toucan"
+asset_base = "/assets"
+version = "v0.1.0"
+content_dir = "content"
+output_dir = "public"
+asset_dir = "assets"
+static_dir = "static"
+theme = "default"
+paginate = 100
+author = "NikolasSkyl"
+social = "https://github.com/NikolasSkyl/toucan"
+share_article = true
+comments = "none"
+contact = "https://github.com/NikolasSkyl/toucan/issues"
+github_url = "https://github.com/NikolasSkyl/toucan"
+releases_url = "https://github.com/NikolasSkyl/toucan/releases"
+
+[menu.docs]
+Name = "Docs"
+Title = "Toucan documentation"
+URL = "/docs/"
+weight = 1
+
+[menu.chronicles]
+Name = "Chronicles"
+Title = "Project notes and releases"
+URL = "/chronicles/"
+weight = 2
+
+[menu.github]
+Name = "GitHub"
+Title = "Toucan on GitHub"
+URL = "https://github.com/NikolasSkyl/toucan"
+weight = 3
+
+[community.github]
+Name = "GitHub"
+Title = "Open issues, follow releases, or read the source."
+URL = "https://github.com/NikolasSkyl/toucan"
+weight = 1
+
+[share.bluesky]
+Name = "Bluesky"
+Title = "Share on Bluesky"
+URL = "https://bsky.app/intent/compose?text=https://nikolasskyl.github.io/toucan"
+weight = 1

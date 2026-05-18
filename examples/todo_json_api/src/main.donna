@@ -1,0 +1,177 @@
+import toucan
+import sqlite
+import json
+import donna/string
+
+fn db_init(path: String) -> Nil:
+  case sqlite.open(path):
+    sqlite.Err(_) -> Nil
+    sqlite.Ok(db) ->
+      let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS todos (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, done INTEGER NOT NULL DEFAULT 0)")
+      sqlite.close(db)
+
+fn db_all(path: String) -> List(List(sqlite.Value)):
+  case sqlite.open(path):
+    sqlite.Err(_) -> []
+    sqlite.Ok(db) ->
+      case sqlite.query(db, "SELECT id, title, done FROM todos ORDER BY id ASC"):
+        sqlite.Err(_) ->
+          sqlite.close(db)
+          []
+        sqlite.Ok(rows) ->
+          sqlite.close(db)
+          rows
+
+fn db_create(path: String, title: String) -> Nil:
+  case string.is_empty(string.trim(title)):
+    True -> Nil
+    False ->
+      case sqlite.open(path):
+        sqlite.Err(_) -> Nil
+        sqlite.Ok(db) ->
+          case sqlite.prepare(db, "INSERT INTO todos (title) VALUES (?)"):
+            sqlite.Err(_) -> sqlite.close(db)
+            sqlite.Ok(stmt) ->
+              let _ = sqlite.bind_text(stmt, 1, string.trim(title))
+              let _ = sqlite.step(stmt)
+              sqlite.finalize(stmt)
+              sqlite.close(db)
+
+fn db_toggle(path: String, id: Int) -> Nil:
+  case sqlite.open(path):
+    sqlite.Err(_) -> Nil
+    sqlite.Ok(db) ->
+      case sqlite.prepare(db, "UPDATE todos SET done = 1 - done WHERE id = ?"):
+        sqlite.Err(_) -> sqlite.close(db)
+        sqlite.Ok(stmt) ->
+          let _ = sqlite.bind_int(stmt, 1, id)
+          let _ = sqlite.step(stmt)
+          sqlite.finalize(stmt)
+          sqlite.close(db)
+
+fn db_delete(path: String, id: Int) -> Nil:
+  case sqlite.open(path):
+    sqlite.Err(_) -> Nil
+    sqlite.Ok(db) ->
+      case sqlite.prepare(db, "DELETE FROM todos WHERE id = ?"):
+        sqlite.Err(_) -> sqlite.close(db)
+        sqlite.Ok(stmt) ->
+          let _ = sqlite.bind_int(stmt, 1, id)
+          let _ = sqlite.step(stmt)
+          sqlite.finalize(stmt)
+          sqlite.close(db)
+
+fn cell_str(v: sqlite.Value) -> String:
+  case v:
+    sqlite.Text(s)  -> s
+    sqlite.Int(n)   -> string.from_int(n)
+    sqlite.Float(_) -> ""
+    sqlite.Blob(s)  -> s
+    sqlite.Null     -> ""
+
+fn row_nth(row: List(sqlite.Value), n: Int) -> sqlite.Value:
+  case n:
+    0 ->
+      case row:
+        []      -> sqlite.Null
+        [v, ..] -> v
+    _ ->
+      case row:
+        []          -> sqlite.Null
+        [_, ..rest] -> row_nth(rest, n - 1)
+
+fn row_to_json(row: List(sqlite.Value)) -> json.Json:
+  let id    = cell_str(row_nth(row, 0))
+  let title = cell_str(row_nth(row, 1))
+  let done  = cell_str(row_nth(row, 2)) == "1"
+  json.Object([
+    #("id",    json.Int(string.to_int(id))),
+    #("title", json.Str(title)),
+    #("done",  json.Bool(done))
+  ])
+
+fn rows_to_json(rows: List(List(sqlite.Value))) -> json.Json:
+  json.Array(rows_to_list(rows))
+
+fn rows_to_list(rows: List(List(sqlite.Value))) -> List(json.Json):
+  case rows:
+    []           -> []
+    [r, ..rest]  -> [row_to_json(r), ..rows_to_list(rest)]
+
+fn ok_json(msg: String) -> String:
+  json.encode(json.Object([#("ok", json.Bool(True)), #("message", json.Str(msg))]))
+
+fn err_json(msg: String) -> String:
+  json.encode(json.Object([#("ok", json.Bool(False)), #("error", json.Str(msg))]))
+
+fn handler(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.try_with(db, list_todos)
+  |> toucan.try_with(db, create_todo)
+  |> toucan.try_with(db, toggle_todo)
+  |> toucan.try_with(db, delete_todo)
+  |> toucan.not_found
+
+fn list_todos(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/todos")
+  |> do_list(db)
+
+fn do_list(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      toucan.json(c, json.encode(rows_to_json(db_all(db))))
+    other -> other
+
+fn create_todo(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.post
+  |> toucan.path("/todos")
+  |> do_create(db)
+
+fn do_create(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let body = toucan.body_of(c)
+      case json.open(body):
+        json.Err(_) -> toucan.respond(c, 400, "application/json", err_json("invalid JSON"))
+        json.Ok(doc) ->
+          let title = json.unwrap_string(json.query_string(doc, "title"))
+          let _ = json.close(doc)
+          case string.is_empty(string.trim(title)):
+            True -> toucan.respond(c, 400, "application/json", err_json("title required"))
+            False ->
+              let _ = db_create(db, title)
+              toucan.respond(c, 201, "application/json", ok_json("created"))
+    other -> other
+
+fn toggle_todo(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.patch
+  |> toucan.path("/todos/:id/toggle")
+  |> do_toggle(db)
+
+fn do_toggle(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let _ = db_toggle(db, string.to_int(toucan.param(c, "id")))
+      toucan.json(c, ok_json("toggled"))
+    other -> other
+
+fn delete_todo(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  c
+  |> toucan.delete
+  |> toucan.path("/todos/:id")
+  |> do_delete(db)
+
+fn do_delete(c: toucan.Ctx, db: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let _ = db_delete(db, string.to_int(toucan.param(c, "id")))
+      toucan.json(c, ok_json("deleted"))
+    other -> other
+
+pub fn main() -> Nil:
+  db_init("todos.db")
+  toucan.serve_with("todos.db", handler, 8000)

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Upload · Toucan</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">🦜 toucan / file_upload</div>
+
+    <div class="card">
+      <h1>Upload a file</h1>
+      <p>Select a text file (.txt, .md, .csv, …) to upload.</p>
+
+      {{#success}}
+      <div class="flash flash-ok">Uploaded: <strong>{{filename}}</strong></div>
+      {{/success}}
+
+      {{#error}}
+      <div class="flash flash-err">{{error}}</div>
+      {{/error}}
+
+      <form method="post" action="/upload" enctype="multipart/form-data">
+        <div class="field">
+          <label>File</label>
+          <input type="file" name="file" accept=".txt,.md,.csv,.log,.json,.toml,.html,.css,.js">
+        </div>
+        <button class="btn btn-full">Upload →</button>
+      </form>
+
+      <div class="sep">or</div>
+
+      <form id="image-upload-form" method="post" action="/upload-image" enctype="multipart/form-data">
+        <div class="field">
+          <label>Image</label>
+          <input id="image-file" type="file" accept="image/png,image/jpeg,image/gif,image/webp">
+          <input id="image-name" type="hidden" name="image_name">
+          <input id="image-data" type="hidden" name="image_data">
+        </div>
+        <button class="btn btn-full btn-ghost">Upload image →</button>
+      </form>
+    </div>
+
+    {{#has_files}}
+    <div class="card">
+      <h2>Uploaded files</h2>
+      <ul class="todo-list">
+        {{#files}}
+        <li class="todo-item">
+          {{#is_image}}
+          <img class="thumb" src="{{image_src}}" alt="">
+          {{/is_image}}
+          <a href="/view/{{name}}" class="todo-label">{{name}}</a>
+          <form class="inline-form" method="post" action="/delete/{{name}}">
+            <button class="btn btn-sm btn-danger">✕</button>
+          </form>
+        </li>
+        {{/files}}
+      </ul>
+    </div>
+    {{/has_files}}
+  </div>
+  <script>
+    const imageForm = document.getElementById('image-upload-form');
+    const imageFile = document.getElementById('image-file');
+    const imageName = document.getElementById('image-name');
+    const imageData = document.getElementById('image-data');
+    const maxEdge = 900;
+    const maxPayload = 450000;
+
+    function loadImage(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    function canvasDataUrl(img) {
+      const scale = Math.min(1, maxEdge / Math.max(img.naturalWidth, img.naturalHeight));
+      const width = Math.max(1, Math.round(img.naturalWidth * scale));
+      const height = Math.max(1, Math.round(img.naturalHeight * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      return canvas.toDataURL('image/jpeg', 0.78);
+    }
+
+    function jpegName(name) {
+      const dot = name.lastIndexOf('.');
+      const stem = dot < 0 ? name : name.slice(0, dot);
+      return `${stem || 'image'}.jpg`;
+    }
+
+    imageForm.addEventListener('submit', (event) => {
+      const file = imageFile.files && imageFile.files[0];
+      if (!file) return;
+      if (imageData.value && imageName.value === jpegName(file.name)) return;
+
+      event.preventDefault();
+      loadImage(file).then((img) => {
+        const dataUrl = canvasDataUrl(img);
+        if (dataUrl.length > maxPayload) {
+          alert('Image is too large. Please choose a smaller image.');
+          return;
+        }
+        imageName.value = jpegName(file.name);
+        imageData.value = dataUrl;
+        imageForm.requestSubmit();
+      }).catch(() => {
+        alert('Could not read image data.');
+      });
+    });
+  </script>
+</body>
+</html>

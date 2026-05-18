@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+{{> head}}
+<body>
+  {{> header}}
+
+  <main>
+    <div class="docs-layout">
+      <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
+
+      <aside class="docs-sidebar" id="docs-sidebar" aria-label="Documentation">
+        <span class="toc-label">Documentation</span>
+        <nav aria-label="Documentation pages">
+          {{{doc_sidebar}}}
+        </nav>
+      </aside>
+
+      <div class="docs-main">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Open table of contents" aria-expanded="false">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+          Documentation
+        </button>
+
+        <article class="prose" id="doc-article">
+          <h1>{{title}}</h1>
+          <p>{{lead}}</p>
+          {{{content}}}
+          {{{doc_nav}}}
+        </article>
+      </div>
+    </div>
+  </main>
+
+  {{> footer}}
+</body>
+</html>

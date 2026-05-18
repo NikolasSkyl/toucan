@@ -1,0 +1,8 @@
+name = "basic"
+version = "0.1.0"
+description = "Minimal Toucan hello-world — routing, forms, query params"
+
+[dependencies]
+donna  = { git = "https://github.com/donna-lang/donna_stdlib",  version = ">=0.2.0 and <1.0.0" }
+toucan = { path = "../.." }
+mongoose = { git = "https://github.com/NikolasSkyl/mongoose", version = ">=0.2.0 and <1.0.0" }

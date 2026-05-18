@@ -1,0 +1,231 @@
+import toucan
+import toucan/session
+import toucan/form
+import mustache
+import sqlite
+import mongoose
+import donna/string
+
+@external("c", "donna_generate_salt")
+fn donna_generate_salt() -> String
+
+@external("c", "donna_hash_password")
+fn donna_hash_password(password: String, salt: String) -> String
+
+fn read_template(name: String) -> String:
+  case mongoose.read_file("priv/templates/" <> name <> ".mustache"):
+    mongoose.Err(_) -> "<!-- template missing: " <> name <> " -->"
+    mongoose.Ok(t)  -> t
+
+fn db_init(path: String) -> Nil:
+  case sqlite.open(path):
+    sqlite.Err(_) -> Nil
+    sqlite.Ok(db) ->
+      let _ = sqlite.exec(db, "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL, salt TEXT NOT NULL)")
+      sqlite.close(db)
+
+fn sql_escape(s: String) -> String:
+  sql_escape_at(s, 0, string.length(s), "")
+
+fn sql_escape_at(s: String, i: Int, len: Int, acc: String) -> String:
+  case i >= len:
+    True -> acc
+    False ->
+      case string.char_at(s, i) == 39:
+        True -> sql_escape_at(s, i + 1, len, acc <> "''")
+        False -> sql_escape_at(s, i + 1, len, acc <> string.char_str(s, i))
+
+fn db_find_user(path: String, username: String) -> List(sqlite.Value):
+  case sqlite.open(path):
+    sqlite.Err(_) -> []
+    sqlite.Ok(db) ->
+      let sql = "SELECT id, username, password_hash, salt FROM users WHERE username = '" <> sql_escape(username) <> "' LIMIT 1"
+      case sqlite.query(db, sql):
+        sqlite.Err(_) ->
+          sqlite.close(db)
+          []
+        sqlite.Ok(rows) ->
+          sqlite.close(db)
+          case rows:
+            [] -> []
+            [row, ..] -> row
+
+fn db_create_user(path: String, username: String, password: String) -> Bool:
+  case db_find_user(path, username):
+    [_, ..] -> False
+    [] ->
+      let salt = donna_generate_salt()
+      let hash = donna_hash_password(password, salt)
+      case sqlite.open(path):
+        sqlite.Err(_) -> False
+        sqlite.Ok(db) ->
+          let sql = "INSERT INTO users (username, password_hash, salt) VALUES ('" <> sql_escape(username) <> "', '" <> sql_escape(hash) <> "', '" <> sql_escape(salt) <> "')"
+          let _ = sqlite.exec(db, sql)
+          sqlite.close(db)
+          True
+
+fn cell_str(v: sqlite.Value) -> String:
+  case v:
+    sqlite.Text(s)  -> s
+    sqlite.Int(n)   -> string.from_int(n)
+    sqlite.Float(_) -> ""
+    sqlite.Blob(s)  -> s
+    sqlite.Null     -> ""
+
+fn row_nth(row: List(sqlite.Value), n: Int) -> sqlite.Value:
+  case n:
+    0 ->
+      case row:
+        []      -> sqlite.Null
+        [v, ..] -> v
+    _ ->
+      case row:
+        []          -> sqlite.Null
+        [_, ..rest] -> row_nth(rest, n - 1)
+
+fn verify_password(row: List(sqlite.Value), password: String) -> Bool:
+  let stored_hash = cell_str(row_nth(row, 2))
+  let salt        = cell_str(row_nth(row, 3))
+  let attempt     = donna_hash_password(password, salt)
+  stored_hash == attempt
+
+fn handler(c: toucan.Ctx, store: session.Store) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let sid = session.start(c, store)
+      c
+      |> toucan.try(static_files)
+      |> toucan.try_with(#(store, sid), root)
+      |> toucan.try_with(#(store, sid), register_page)
+      |> toucan.try_with(#(store, sid), register_post)
+      |> toucan.try_with(#(store, sid), login_page)
+      |> toucan.try_with(#(store, sid), login_post)
+      |> toucan.try_with(#(store, sid), dashboard)
+      |> toucan.try_with(#(store, sid), logout)
+      |> toucan.not_found
+    other -> other
+
+fn static_files(c: toucan.Ctx) -> toucan.Ctx:
+  toucan.static_dir(c, "priv")
+
+fn root(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  let #(store, sid) = state
+  c
+  |> toucan.get
+  |> toucan.path("/")
+  |> do_root(store, sid)
+
+fn do_root(c: toucan.Ctx, store: session.Store, sid: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let user = session.get(store, sid, "username")
+      case string.is_empty(user):
+        True  -> toucan.redirect(c, "/login")
+        False -> toucan.redirect(c, "/dashboard")
+    other -> other
+
+fn register_page(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/register")
+  |> toucan.html(mustache.render(read_template("register"), [#("error", "")]))
+
+fn register_post(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  let #(store, sid) = state
+  c
+  |> toucan.post
+  |> toucan.path("/register")
+  |> do_register(store, sid)
+
+fn do_register(c: toucan.Ctx, store: session.Store, sid: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let fields   = toucan.form_fields(c)
+      let username = string.trim(form.get(fields, "username"))
+      let password = form.get(fields, "password")
+      let tmpl     = read_template("register")
+      case string.is_empty(username):
+        True ->
+          toucan.html(c, mustache.render(tmpl, [#("error", "Username is required")]))
+        False ->
+          case string.is_empty(password):
+            True ->
+              toucan.html(c, mustache.render(tmpl, [#("error", "Password is required")]))
+            False ->
+              case db_create_user("users.db", username, password):
+                False ->
+                  toucan.html(c, mustache.render(tmpl, [#("error", "Username already taken")]))
+                True ->
+                  let _ = session.put(store, sid, "username", username)
+                  toucan.redirect(c, "/dashboard")
+                  |> session.set_cookie(sid)
+    other -> other
+
+fn login_page(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/login")
+  |> toucan.html(mustache.render(read_template("login"), [#("error", "")]))
+
+fn login_post(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  let #(store, sid) = state
+  c
+  |> toucan.post
+  |> toucan.path("/login")
+  |> do_login(store, sid)
+
+fn do_login(c: toucan.Ctx, store: session.Store, sid: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let fields   = toucan.form_fields(c)
+      let username = string.trim(form.get(fields, "username"))
+      let password = form.get(fields, "password")
+      let tmpl     = read_template("login")
+      let row      = db_find_user("users.db", username)
+      case row:
+        [] ->
+          toucan.html(c, mustache.render(tmpl, [#("error", "Invalid username or password")]))
+        _ ->
+          case verify_password(row, password):
+            False ->
+              toucan.html(c, mustache.render(tmpl, [#("error", "Invalid username or password")]))
+            True ->
+              let _ = session.put(store, sid, "username", username)
+              toucan.redirect(c, "/dashboard")
+              |> session.set_cookie(sid)
+    other -> other
+
+fn dashboard(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  let #(store, sid) = state
+  let user = session.get(store, sid, "username")
+  c
+  |> toucan.get
+  |> toucan.path("/dashboard")
+  |> show_dashboard(user)
+
+fn show_dashboard(c: toucan.Ctx, user: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      case string.is_empty(user):
+        True  -> toucan.redirect(c, "/login")
+        False -> toucan.html(c, mustache.render(read_template("dashboard"), [#("username", user)]))
+    other -> other
+
+fn logout(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+  let #(store, sid) = state
+  c
+  |> toucan.get
+  |> toucan.path("/logout")
+  |> do_logout(store, sid)
+
+fn do_logout(c: toucan.Ctx, store: session.Store, sid: String) -> toucan.Ctx:
+  case c:
+    toucan.Active(_, _) ->
+      let _ = session.destroy(store, sid)
+      toucan.redirect(c, "/login")
+      |> toucan.set_header("Set-Cookie", "sid=; HttpOnly; Path=/; SameSite=Lax; Max-Age=0")
+    other -> other
+
+pub fn main() -> Nil:
+  db_init("users.db")
+  toucan.serve_with(session.new_store(), handler, 8000)

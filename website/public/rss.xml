@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+<title>Toucan</title>
+<link>https://nikolasskyl.github.io/toucan</link>
+<description>Toucan</description>
+<item><title>Toucan v0.1.0</title><link>https://nikolasskyl.github.io/toucan/posts/v0-1-0/</link><description>Toucan v0.1.0</description></item>
+<item><title>Chronicles</title><link>https://nikolasskyl.github.io/toucan/chronicles/</link><description>Chronicles</description></item>
+<item><title>Routing</title><link>https://nikolasskyl.github.io/toucan/docs/routing/</link><description>Routing</description></item>
+<item><title>Middleware</title><link>https://nikolasskyl.github.io/toucan/docs/middleware/</link><description>Middleware</description></item>
+<item><title>Requests</title><link>https://nikolasskyl.github.io/toucan/docs/requests/</link><description>Requests</description></item>
+<item><title>Responses</title><link>https://nikolasskyl.github.io/toucan/docs/responses/</link><description>Responses</description></item>
+<item><title>Handlers</title><link>https://nikolasskyl.github.io/toucan/docs/handlers/</link><description>Handlers</description></item>
+<item><title>Getting Started</title><link>https://nikolasskyl.github.io/toucan/docs/</link><description>Getting Started</description></item>
+<item><title>WebSockets</title><link>https://nikolasskyl.github.io/toucan/docs/websockets/</link><description>WebSockets</description></item>
+</channel></rss>

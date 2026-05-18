@@ -1,0 +1,21 @@
+import toucan
+import unittest/should
+
+pub fn smoke_test() -> String:
+  should.pass()
+
+fn state_route(c: toucan.Ctx, message: String) -> toucan.Ctx:
+  c
+  |> toucan.get
+  |> toucan.path("/")
+  |> toucan.ok(message)
+
+pub fn try_with_passes_state_test() -> String:
+  case toucan.try_with(toucan.new_ctx("GET", "/", "", "", "", ""), "hello", state_route):
+    toucan.Matched(toucan.Res(status, content_type, body, _)) ->
+      should.all([
+        should.equal_int(status, 200),
+        should.equal_string(content_type, "text/plain; charset=utf-8"),
+        should.equal_string(body, "hello")
+      ])
+    _ -> should.fail("expected stateful route to match")
