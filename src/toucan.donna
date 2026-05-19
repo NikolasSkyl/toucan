@@ -20,6 +20,7 @@
 //// pub fn main() -> Nil:
 //// toucan.serve(handler, 8080)
 
+import donna/io
 import donna/string
 import mongoose
 import toucan/form
@@ -471,9 +472,11 @@ pub fn redirect(c: Ctx, url: String) -> Ctx:
 /// ```
 pub fn serve(handler: fn(Ctx) -> Ctx, port: Int) -> Nil:
   case mongoose.start(port):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(server) ->
-      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      io.println(
+        "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      )
       event_loop(server, handler)
 
 /// Start the HTTP server with shared application state.
@@ -489,9 +492,11 @@ pub fn serve(handler: fn(Ctx) -> Ctx, port: Int) -> Nil:
 /// ```
 pub fn serve_with(state: a, handler: fn(Ctx, a) -> Ctx, port: Int) -> Nil:
   case mongoose.start(port):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(server) ->
-      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      io.println(
+        "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      )
       event_loop_with(server, state, handler)
 
 /// Start the HTTP server with a request logger.
@@ -504,9 +509,11 @@ pub fn serve_logged(
   level: logger.Level
 ) -> Nil:
   case mongoose.start(port):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(server) ->
-      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      io.println(
+        "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      )
       event_loop_logged(server, handler, level)
 
 /// Start the HTTP server with shared state and a request logger.
@@ -517,9 +524,11 @@ pub fn serve_with_logged(
   level: logger.Level
 ) -> Nil:
   case mongoose.start(port):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(server) ->
-      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      io.println(
+        "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      )
       event_loop_with_logged(server, state, handler, level)
 
 /// Start an HTTP + WebSocket chat server.
@@ -542,9 +551,11 @@ pub fn serve_chat(
   port: Int
 ) -> Nil:
   case mongoose.start(port):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(server) ->
-      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      io.println(
+        "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      )
       chat_event_loop(server, handler, ws)
 
 fn chat_event_loop(
@@ -553,7 +564,7 @@ fn chat_event_loop(
   ws: fn(String, String) -> String
 ) -> Nil:
   case mongoose.accept_event(server):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(ev) ->
       case ev:
         mongoose.Http(req) ->
@@ -600,9 +611,11 @@ pub fn serve_with_chat(
   port: Int
 ) -> Nil:
   case mongoose.start(port):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(server) ->
-      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      io.println(
+        "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      )
       chat_with_event_loop(server, state, handler, ws)
 
 fn chat_with_event_loop(
@@ -612,7 +625,7 @@ fn chat_with_event_loop(
   ws: fn(String, String) -> String
 ) -> Nil:
   case mongoose.accept_event(server):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(ev) ->
       case ev:
         mongoose.Http(req) ->
@@ -657,14 +670,16 @@ pub fn serve_ws(
   port: Int
 ) -> Nil:
   case mongoose.start(port):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(server) ->
-      echo "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      io.println(
+        "Toucan listening on:  " <> logger.paint(logger.dim, "http://localhost:" <> string.from_int(port))
+      )
       ws_event_loop(server, handler, ws)
 
 fn event_loop(server: mongoose.Server, handler: fn(Ctx) -> Ctx) -> Nil:
   case mongoose.accept(server):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(req) ->
       let pth = mongoose.path(req)
       let c = Active(
@@ -687,7 +702,7 @@ fn event_loop_with(
   handler: fn(Ctx, a) -> Ctx
 ) -> Nil:
   case mongoose.accept(server):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(req) ->
       let pth = mongoose.path(req)
       let c = Active(
@@ -716,7 +731,7 @@ fn event_loop_logged(
   level: logger.Level
 ) -> Nil:
   case mongoose.accept(server):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(req) ->
       let method = mongoose.method(req)
       let pth = mongoose.path(req)
@@ -744,7 +759,7 @@ fn event_loop_with_logged(
   level: logger.Level
 ) -> Nil:
   case mongoose.accept(server):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(req) ->
       let method = mongoose.method(req)
       let pth = mongoose.path(req)
@@ -771,7 +786,7 @@ fn ws_event_loop(
   ws: fn(String, String) -> String
 ) -> Nil:
   case mongoose.accept_event(server):
-    mongoose.Err(e) -> echo e
+    mongoose.Err(e) -> io.println(e)
     mongoose.Ok(ev) ->
       case ev:
         mongoose.Http(req) ->

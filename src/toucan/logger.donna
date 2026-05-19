@@ -13,6 +13,7 @@
 //// ```
 
 import donna/string
+import donna/io
 
 pub const reset = "\u{001b}[0m"
 pub const bold = "\u{001b}[1m"
@@ -40,7 +41,9 @@ pub fn log(level: Level, method: String, pth: String, status: Int) -> Nil:
   case level:
     Silent -> Nil
     Verbose ->
-      echo paint(dim, "→") <> " " <> colored_method(method) <> " " <> paint(dim, pth) <> " " <> colored_status(status)
+      io.println(
+        paint(dim, "→") <> " " <> colored_method(method) <> " " <> paint(dim, pth) <> " " <> colored_status(status)
+      )
 
 fn colored_method(m: String) -> String:
   case m:
