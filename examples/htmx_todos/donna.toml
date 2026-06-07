@@ -3,7 +3,7 @@ version = "0.1.0"
 description = "Todo list with htmx — partial HTML updates, no full-page reloads"
 
 [dependencies]
-donna   = { git = "https://github.com/donna-lang/donna_stdlib",  version = ">=0.2.0 and <1.0.0" }
+donna   = { git = "https://github.com/donna-lang/donna_stdlib",  version = ">=0.3.1 and <1.0.0" }
 toucan  = { path = "../.." }
 mongoose = { git = "https://github.com/NikolasSkyl/mongoose", version = ">=0.2.0 and <1.0.0" }
 sqlite  = { git = "https://github.com/donna-lang/sqlite",        version = ">=0.1.1 and <1.0.0" }

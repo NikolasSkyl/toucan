@@ -3,7 +3,7 @@ version = "0.1.0"
 description = "Text file upload — multipart parsing, save to disk, list uploads"
 
 [dependencies]
-donna   = { git = "https://github.com/donna-lang/donna_stdlib",  version = ">=0.2.0 and <1.0.0" }
+donna   = { git = "https://github.com/donna-lang/donna_stdlib",  version = ">=0.3.1 and <1.0.0" }
 toucan  = { path = "../.." }
 mongoose = { git = "https://github.com/NikolasSkyl/mongoose", version = ">=0.2.0 and <1.0.0" }
 mustache = { git = "https://github.com/NikolasSkyl/mustache",    version = ">=0.1.1 and <1.0.0" }

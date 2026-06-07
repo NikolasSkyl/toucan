@@ -31,7 +31,7 @@ pub fn new_store() -> Store:
 ///
 /// Reads the `sid` cookie. If the cookie is missing, generates a new random
 /// session ID. Call `set_cookie` on your response to send it to the client.
-pub fn start(c: toucan.Ctx, store: Store) -> String:
+pub fn start(c: toucan.Ctx, _store: Store) -> String:
   let cookies = cookie.parse(toucan.header_of(c, "Cookie"))
   let existing = cookie.get(cookies, "sid")
   case string.is_empty(existing):
@@ -41,16 +41,16 @@ pub fn start(c: toucan.Ctx, store: Store) -> String:
 /// Read a value from the session.
 ///
 /// Returns `""` when the key or session does not exist.
-pub fn get(store: Store, sid: String, key: String) -> String:
+pub fn get(_store: Store, sid: String, key: String) -> String:
   donna_session_get_ffi(sid, key)
 
 /// Write a value into the session.
-pub fn put(store: Store, sid: String, key: String, value: String) -> Nil:
+pub fn put(_store: Store, sid: String, key: String, value: String) -> Nil:
   let _ = donna_session_put_ffi(sid, key, value)
   Nil
 
 /// Remove a session and all its data.
-pub fn destroy(store: Store, sid: String) -> Nil:
+pub fn destroy(_store: Store, sid: String) -> Nil:
   let _ = donna_session_destroy_ffi(sid)
   Nil
 

@@ -3,7 +3,7 @@ import mustache
 import mongoose
 import donna/string
 import donna/files
-import donna/list
+import donna/path
 
 @external("c", "donna_save_data_url_file")
 fn save_data_url_file(path: String, data: String) -> Int
@@ -93,7 +93,7 @@ fn safe_filename(name: String) -> String:
   string.replace(string.replace(name, "/", "_"), "..", "_")
 
 fn is_image_name(name: String) -> Bool:
-  case files.extension(name):
+  case path.extension(name):
     ".png"  -> True
     ".PNG"  -> True
     ".jpg"  -> True

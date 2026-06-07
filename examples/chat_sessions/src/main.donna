@@ -53,7 +53,7 @@ fn do_root(c: toucan.Ctx, store: session.Store, sid: String) -> toucan.Ctx:
         False -> toucan.redirect(c, "/chat")
     other -> other
 
-fn join_page(c: toucan.Ctx, state: #(session.Store, String)) -> toucan.Ctx:
+fn join_page(c: toucan.Ctx, _state: #(session.Store, String)) -> toucan.Ctx:
   c
   |> toucan.get
   |> toucan.path("/join")
